@@ -16,7 +16,7 @@ object Libraries {
   )
 
   val `zio-json-libs` = Seq(
-    "dev.zio" %% "zio-json" % "0.7.17"
+    "dev.zio" %% "zio-json" % "0.7.25"
   )
 
   val doobie = Seq(
