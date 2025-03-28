@@ -16,17 +16,30 @@ case class RepositoryWriteEvent[+EventType, +DoneBy](
     event: EventType
 )
 
-sealed trait EventStoreEvent[+EventType, +DoneBy]
-case class RepositoryEvent[+EventType: Tag, +DoneBy: Tag](
+trait Tuple2Accessor[A] {
+  type EvenType
+  type DoneBy
+}
+object Toto {
+  implicit def toto[A, B]: Tuple2Accessor[(A, B)] = new Tuple2Accessor[(A, B)] {
+    override type EvenType = A
+    override type DoneBy = B
+  }
+}
+
+import Toto.*
+
+sealed trait EventStoreEvent[+E <: (?, ?)]
+case class RepositoryEvent[E <: (?, ?) : Tag : Tuple2Accessor](
     processId: ProcessId,
     aggregateId: AggregateId,
     aggregateName: AggregateName,
     aggregateVersion: AggregateVersion,
     sentDate: OffsetDateTime,
     eventStoreVersion: EventStoreVersion,
-    doneBy: DoneBy,
-    event: EventType
-) extends EventStoreEvent[EventType, DoneBy] {
+    doneBy: Tuple2Accessor[E]#EvenType,
+    event: Tuple2Accessor[E]#DoneBy
+) extends EventStoreEvent[E] {
   private[eventstore] def eventTag: LightTypeTag = implicitly[Tag[EventType]].tag
 
   private[eventstore] def doneByTag: LightTypeTag = implicitly[Tag[DoneBy]].tag

@@ -97,8 +97,8 @@ object EventRepository {
 
 trait EventRepository[Decoder[_], Encoder[_]] {
 
-  def getAllEvents[A: Decoder: Tag, DoneBy: Decoder: Tag]
-      : ZIO[Scope, Nothing, Stream[Unexpected, RepositoryEvent[A, DoneBy]]]
+  def getAllEvents[A <: (_, _): Decoder: Tag]
+      : ZIO[Scope, Nothing, Stream[Unexpected, RepositoryEvent[A]]]
 
   def listEventStreamWithName(
       aggregateName: AggregateName,
