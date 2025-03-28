@@ -5,7 +5,7 @@ import EventRepository.Error.{Unexpected, VersionConflict}
 import EventRepository.{Direction, SaveEventError, Subscription}
 import eventstore.EventRepository.LastEventToHandle.{LastEvent, Version}
 import zio.stream.{UStream, ZStream}
-import zio.{Chunk, Random, Ref, Tag, TagK, URLayer, ZIO, durationInt}
+import zio.{Chunk, LightTypeTag, Random, Ref, Tag, TagK, URLayer, ZIO, durationInt}
 import zio.test.*
 import zio.test.Assertion.*
 import zio.test.magnolia.DeriveGen
@@ -25,8 +25,12 @@ object EventRepositorySpec {
   case object C extends Event2
   case class D(foo: Boolean, bar: Int) extends Event2
 
-  implicit class WriteEventOps[+E: Tag, +DoneBy: Tag](
-      events: Seq[RepositoryEvent[E, DoneBy]]
+
+
+  //implicit val doneBy: DoneBy[]
+
+  implicit class WriteEventOps[+E: Tag: DoneBy](
+      events: Seq[RepositoryEvent[E]]
   ) {
     def asRepositoryWriteEvents =
       events.map(event =>
@@ -43,6 +47,12 @@ object EventRepositorySpec {
   }
 
   implicit class Ops[A: Tag](a: A) {
+
+    implicit val ADoneBy: DoneBy[A] = new DoneBy[A] {
+      type DoneByT = User
+      val tag: LightTypeTag = implicitly[Tag[User]].tag
+    }
+
     def asRepositoryEvent(
         version: AggregateVersion = AggregateVersion.initial,
         eventStoreVersion: EventStoreVersion = EventStoreVersion.initial,
@@ -51,7 +61,7 @@ object EventRepositorySpec {
       for {
         processId <- ProcessId.generate
         userId <- Random.nextUUID.map(x => User(x.toString))
-      } yield RepositoryEvent[A, User](
+      } yield RepositoryEvent[A](
         processId = processId,
         aggregateId = streamId.aggregateId,
         aggregateName = streamId.aggregateName,
@@ -69,7 +79,7 @@ object EventRepositorySpec {
       for {
         processId <- ProcessId.generate
         userId <- Random.nextUUID.map(x => User(x.toString))
-      } yield RepositoryWriteEvent[A, User](
+      } yield RepositoryWriteEvent[A](
         processId = processId,
         aggregateId = streamId.aggregateId,
         aggregateName = streamId.aggregateName,
@@ -122,8 +132,8 @@ object EventRepositorySpec {
     Any,
     (
         EventStreamId,
-        List[RepositoryWriteEvent[EventType, User]],
-        List[RepositoryWriteEvent[EventType, User]]
+        List[RepositoryWriteEvent[EventType]],
+        List[RepositoryWriteEvent[EventType]]
     )
   ] = {
     for {
@@ -219,7 +229,7 @@ object EventRepositorySpec {
               )
             })
             _ <- ZIO.serviceWithZIO[EventRepository[Decoder, Encoder]](
-              _.saveEvents[Event1, User](firstStreamId, Seq.empty)
+              _.saveEvents[Event1](firstStreamId, Seq.empty)
             )
           } yield assertCompletes
         },
@@ -234,7 +244,7 @@ object EventRepositorySpec {
               )
             })
             result <- ZIO.serviceWithZIO[EventRepository[Decoder, Encoder]](
-              _.getEventStream[Event1, User](firstStreamId)
+              _.getEventStream[Event1](firstStreamId)
             )
           } yield assert(result)(isEmpty)
         },
@@ -242,8 +252,8 @@ object EventRepositorySpec {
           ZIO.scoped {
             for {
               repository <- ZIO.service[EventRepository[Decoder, Encoder]]
-              listener1 <- repository.listen[Event1, User].map(_.events)
-              listener2 <- repository.listen[Event1, User].map(_.events)
+              listener1 <- repository.listen[Event1].map(_.events)
+              listener2 <- repository.listen[Event1].map(_.events)
               streamId <- AggregateId.generate.map(aggregateId => {
                 EventStreamId(
                   aggregateId = aggregateId,
@@ -287,11 +297,11 @@ object EventRepositorySpec {
               })
               event <- A.asRepositoryWriteEvent(streamId = streamId)
               savedEvents <- repository
-                .saveEvents[Event1, User](streamId, Seq(event))
+                .saveEvents[Event1](streamId, Seq(event))
               secondEvent <- A
                 .asRepositoryWriteEvent(version = v, streamId = streamId)
               error <- repository
-                .saveEvents[Event1, User](streamId, Seq(secondEvent))
+                .saveEvents[Event1](streamId, Seq(secondEvent))
                 .either
             } yield assert(error)(
               isLeft(
@@ -332,7 +342,7 @@ object EventRepositorySpec {
                 )
               )
               error <- repository
-                .saveEvents[Event1, User](streamId, events)
+                .saveEvents[Event1](streamId, events)
                 .either
             } yield assert(error)(
               isLeft(
@@ -354,7 +364,7 @@ object EventRepositorySpec {
             (for {
               repository <- ZIO.service[EventRepository[Decoder, Encoder]]
               _ <- repository.saveEvents(firstStreamId, events)
-              result <- repository.getEventStream[Event1, User](firstStreamId)
+              result <- repository.getEventStream[Event1](firstStreamId)
             } yield assert(result.asRepositoryWriteEvents)(equalTo(events)))
               .provideSome[R](repository)
           }
@@ -364,7 +374,7 @@ object EventRepositorySpec {
             ZIO
               .scoped(for {
                 repository <- ZIO.service[EventRepository[Decoder, Encoder]]
-                stream <- repository.listen[Event1, User].map(_.events)
+                stream <- repository.listen[Event1].map(_.events)
                 _ <- repository.saveEvents(firstStreamId, events)
                 result <- stream
                   .take(events.length.toLong)
@@ -381,7 +391,7 @@ object EventRepositorySpec {
                 .scoped(
                   for {
                     repository <- ZIO.service[EventRepository[Decoder, Encoder]]
-                    stream <- repository.listen[Event1, User].map(_.events)
+                    stream <- repository.listen[Event1].map(_.events)
                     _ <- repository.saveEvents(firstStreamId, events2)
                     _ <- repository.saveEvents(secondStreamId, events)
                     result <- stream
@@ -395,14 +405,14 @@ object EventRepositorySpec {
                 .provideSome[R](repository)
           }
         }, {
-          def save(repositoryEvent: RepositoryWriteEvent[Any, User]) = {
+          def save(repositoryEvent: RepositoryWriteEvent[Any]) = {
             import repositoryEvent._
             def save[EE: Decoder: Encoder: Tag](event: EE) = {
               ZIO.serviceWithZIO[EventRepository[Decoder, Encoder]](
-                _.saveEvents[EE, User](
+                _.saveEvents[EE](
                   EventStreamId(aggregateId, aggregateName),
                   List(
-                    RepositoryWriteEvent[EE, User](
+                    RepositoryWriteEvent[EE](
                       processId = processId,
                       aggregateId = aggregateId,
                       aggregateName = aggregateName,
@@ -435,7 +445,7 @@ object EventRepositorySpec {
                       ).runCollect
                       _ <- ZIO.foreachDiscard(events)(save)
                       result <- repository
-                        .getAllEvents[Event, User].flatMap(_.runCollect)
+                        .getAllEvents[Event].flatMap(_.runCollect)
 
                     } yield assert(result.asRepositoryWriteEvents)(
                       equalTo(events)
@@ -452,14 +462,14 @@ object EventRepositorySpec {
                   .scoped {
                     for {
                       repository <- ZIO.service[EventRepository[Decoder, Encoder]]
-                      stream <- repository.listen[Event, User].map(_.events)
+                      stream <- repository.listen[Event].map(_.events)
                       _ <- pickRandomly(List(events1, events2))
                         .runForeach(save)
                       fromListen <- stream
                         .take(events1.length.toLong + events2.length)
                         .runCollect
                       result <- repository
-                        .getAllEvents[Event, User].flatMap(_.runCollect)
+                        .getAllEvents[Event].flatMap(_.runCollect)
 
                     } yield assert(result)(equalTo(fromListen))
                   }
@@ -613,10 +623,10 @@ object EventRepositorySpec {
                 for {
                   repository <- ZIO.service[EventRepository[Decoder, Encoder]]
                   _ <- repository.saveEvents(firstStreamId, events1)
-                  subscription <- repository.listen[Event1, User]
+                  subscription <- repository.listen[Event1]
                   _ <- repository.saveEvents(firstStreamId, events2)
                   lastKnownVersionForEvents2 <- repository
-                    .getAllEvents[Event1, User]
+                    .getAllEvents[Event1]
                     .flatMap(_.runLast)
                     .map(
                       _.map(_.eventStoreVersion)
@@ -624,7 +634,7 @@ object EventRepositorySpec {
                     )
                   result <- subscription.stream
                     .tap {
-                      case e: RepositoryEvent[Event1, User] =>
+                      case e: RepositoryEvent[Event1] =>
                         ZIO.when(
                           e.eventStoreVersion == lastKnownVersionForEvents2
                         )(
@@ -635,7 +645,7 @@ object EventRepositorySpec {
                       case _ => ZIO.unit
                     }
                     .map {
-                      case e: RepositoryEvent[Event1, User] => e.asString
+                      case e: RepositoryEvent[Event1] => e.asString
                       case _: Reset[?, ?]                   => "reset"
                     }
                     .take(nbEvents1 + nbEvents2 * 2 + 1)
@@ -663,10 +673,10 @@ object EventRepositorySpec {
                 for {
                   repository <- ZIO.service[EventRepository[Decoder, Encoder]]
                   _ <- repository.saveEvents(firstStreamId, events1)
-                  subscription <- repository.listen[Event1, User]
+                  subscription <- repository.listen[Event1]
                   _ <- repository.saveEvents(firstStreamId, events2)
                   lastKnownVersionForEvents2 <- repository
-                    .getAllEvents[Event1, User]
+                    .getAllEvents[Event1]
                     .flatMap(_.runLast)
                     .map(
                       _.map(_.eventStoreVersion)
@@ -674,7 +684,7 @@ object EventRepositorySpec {
                     )
                   result <- subscription.stream
                     .tap {
-                      case e: RepositoryEvent[Event1, User] =>
+                      case e: RepositoryEvent[Event1] =>
                         ZIO.when(
                           e.eventStoreVersion == lastKnownVersionForEvents2
                         )(
@@ -683,7 +693,7 @@ object EventRepositorySpec {
                       case _ => ZIO.unit
                     }
                     .map {
-                      case e: RepositoryEvent[Event1, User] => e.asString
+                      case e: RepositoryEvent[Event1] => e.asString
                       case _: Reset[?, ?]                   => "reset"
                     }
                     .take(nbEvents1 + nbEvents2 * 2 + 1)
@@ -708,14 +718,14 @@ object EventRepositorySpec {
               .scoped(
                 for {
                   repository <- ZIO.service[EventRepository[Decoder, Encoder]]
-                  subscription <- repository.listen[Event1, User]
+                  subscription <- repository.listen[Event1]
                   resultFiber <- Live.live(subscription.stream
                     .tap {
                       case _: Reset[?, ?] => repository.saveEvents(firstStreamId, events1)
                       case _ => ZIO.unit
                     }
                     .map {
-                      case e: RepositoryEvent[Event1, User] => e.asString
+                      case e: RepositoryEvent[Event1] => e.asString
                       case _: Reset[?, ?] => "reset"
                     }
                     .take(1 + events1.length)
@@ -736,10 +746,10 @@ object EventRepositorySpec {
             .scoped(
               for {
                 repository <- ZIO.service[EventRepository[Decoder, Encoder]]
-                subscription <- repository.listen[Event1, User]
+                subscription <- repository.listen[Event1]
                 resultFiber <- Live.live(subscription.stream
                   .map {
-                    case e: RepositoryEvent[Event1, User] => e.asString
+                    case e: RepositoryEvent[Event1] => e.asString
                     case _: Reset[?, ?]                   => "reset"
                   }
                   .take(1)
@@ -758,11 +768,11 @@ object EventRepositorySpec {
               .scoped(
                 for {
                   repository <- ZIO.service[EventRepository[Decoder, Encoder]]
-                  subscription <- repository.listen[Event1, User]
+                  subscription <- repository.listen[Event1]
                   _ <- repository.saveEvents(firstStreamId, events)
                   result <- subscription.stream
                     .take(events.length.toLong)
-                    .collect { case e: RepositoryEvent[Event1, User] =>
+                    .collect { case e: RepositoryEvent[Event1] =>
                       e
                     }
                     .timeout(1.seconds)
@@ -783,17 +793,17 @@ object EventRepositorySpec {
                 for {
                   repository <- ZIO.service[EventRepository[Decoder, Encoder]]
                   _ <- repository.saveEvents(firstStreamId, events1)
-                  subscription <- repository.listen[Event1, User]
+                  subscription <- repository.listen[Event1]
                   _ <- repository.saveEvents(firstStreamId, events2)
                   lastKnownVersionForEvents2 <- repository
-                    .getAllEvents[Event1, User]
+                    .getAllEvents[Event1]
                     .flatMap(_.runLast)
                     .map(
                       _.map(_.eventStoreVersion)
                         .getOrElse(EventStoreVersion.initial)
                     )
                   result <- subscription.stream
-                    .collect { case e: RepositoryEvent[Event1, User] =>
+                    .collect { case e: RepositoryEvent[Event1] =>
                       e
                     }
                     .take(nbEvents1 + nbEvents2 * 2)
@@ -826,17 +836,17 @@ object EventRepositorySpec {
                 for {
                   restartedCounter <- Ref.make[Int](0)
                   repository <- ZIO.service[EventRepository[Decoder, Encoder]]
-                  subscription <- repository.listen[Event1, User]
+                  subscription <- repository.listen[Event1]
                   _ <- repository.saveEvents(firstStreamId, events1)
                   lastKnownVersionForEvents <- repository
-                    .getAllEvents[Event1, User]
+                    .getAllEvents[Event1]
                     .flatMap(_.runLast)
                     .map(
                       _.map(_.eventStoreVersion)
                         .getOrElse(EventStoreVersion.initial)
                     )
                   fiber <- subscription.stream
-                    .collect { case e: RepositoryEvent[Event1, User] =>
+                    .collect { case e: RepositoryEvent[Event1] =>
                       e
                     }
                     .take(nbEvents1 * 3 + nbEvents2)
@@ -870,17 +880,17 @@ object EventRepositorySpec {
                 for {
                   restartedCounter <- Ref.make[Int](0)
                   repository <- ZIO.service[EventRepository[Decoder, Encoder]]
-                  subscription <- repository.listen[Event1, User]
+                  subscription <- repository.listen[Event1]
                   _ <- repository.saveEvents(firstStreamId, events1)
                   lastKnownVersionForEvents <- repository
-                    .getAllEvents[Event1, User]
+                    .getAllEvents[Event1]
                     .flatMap(_.runLast)
                     .map(
                       _.map(_.eventStoreVersion)
                         .getOrElse(EventStoreVersion.initial)
                     )
                   fiber <- subscription.stream
-                    .collect { case e: RepositoryEvent[Event1, User] =>
+                    .collect { case e: RepositoryEvent[Event1] =>
                       e
                     }
                     .take(nbEvents1 * 2 + nbEvents2)
@@ -918,15 +928,15 @@ object EventRepositorySpec {
                   repository <- ZIO.service[EventRepository[Decoder, Encoder]]
                   _ <- repository.saveEvents(firstStreamId, events1)
                   lastKnownVersionForEvents <- repository
-                    .getAllEvents[Event1, User]
+                    .getAllEvents[Event1]
                     .flatMap(_.runLast)
                     .map(
                       _.map(_.eventStoreVersion)
                         .getOrElse(EventStoreVersion.initial)
                     )
-                  subscription <- repository.listen[Event1, User]
+                  subscription <- repository.listen[Event1]
                   fiber <- subscription.stream
-                    .collect { case e: RepositoryEvent[Event1, User] =>
+                    .collect { case e: RepositoryEvent[Event1] =>
                       e
                     }
                     .take(1 + nbEvents1 + nbEvents2)
@@ -963,33 +973,33 @@ object EventRepositorySpec {
       ZIO.whenZIO(store.getAndUpdate(_ + 1).map(_ < 2))(self)
   }
 
-  implicit class RepositoryEventOps[E, DoneBy](
-      self: RepositoryEvent[E, DoneBy]
+  implicit class RepositoryEventOps[E](
+      self: RepositoryEvent[E]
   ) {
     def asString = s"event ${self.aggregateVersion}"
   }
 
-  implicit class RepositoryEventsOps[E, DoneBy](
-      self: Seq[RepositoryEvent[E, DoneBy]]
+  implicit class RepositoryEventsOps[E](
+      self: Seq[RepositoryEvent[E]]
   ) {
     def asStrings = self.map(_.asString)
   }
 
-  implicit class RepositoryWriteEventOps[E, DoneBy](
-      self: RepositoryWriteEvent[E, DoneBy]
+  implicit class RepositoryWriteEventOps[E](
+      self: RepositoryWriteEvent[E]
   ) {
     def asString = s"event ${self.aggregateVersion}"
   }
 
-  implicit class RepositoryWriteEventsOps[E, DoneBy](
-      self: Seq[RepositoryWriteEvent[E, DoneBy]]
+  implicit class RepositoryWriteEventsOps[E](
+      self: Seq[RepositoryWriteEvent[E]]
   ) {
     def asStrings = self.map(_.asString)
   }
 
-  implicit class SubscriptionOps[EventType, DoneBy](self: Subscription[EventType, DoneBy]) {
+  implicit class SubscriptionOps[EventType](self: Subscription[EventType]) {
     def events =
       self.stream
-        .collect { case e: RepositoryEvent[EventType, DoneBy] => e }
+        .collect { case e: RepositoryEvent[EventType] => e }
   }
 }
