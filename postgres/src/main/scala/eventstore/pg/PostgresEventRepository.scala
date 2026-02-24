@@ -117,7 +117,7 @@ class PostgresEventRepositoryLive(
       .query[RepositoryEvent[A]]
       .option
       .transact(transactor)
-      .tapErrorCause(ZIO.logErrorCause("listEventStreamWithName", _))
+      .tapErrorCause(ZIO.logErrorCause("getEventByStoreVersion", _))
       .mapError(Unexpected.apply)
 
   private def getAllEventImpl[A: Get: Tag](query: Fragment) =
