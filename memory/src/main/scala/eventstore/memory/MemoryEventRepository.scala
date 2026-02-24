@@ -68,6 +68,13 @@ class MemoryEventRepository[UnusedDecoder[_], UnusedEncoder[_]](
         .map(_.asInstanceOf[RepositoryEvent[EventType]])
     }
 
+  override def getEventByStoreVersion[EventType: UnusedDecoder: Tag](
+      version: EventStoreVersion
+  ): IO[Nothing, Option[RepositoryEvent[EventType]]] =
+    for {
+      result <- storageRef.get.map(_.events.find(_.eventStoreVersion == version)).commit
+    } yield result.asInstanceOf[Option[RepositoryEvent[EventType]]]
+
   override def listEventStreamWithName(
       aggregateName: AggregateName,
       direction: Direction = Direction.Forward
