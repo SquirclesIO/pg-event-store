@@ -1,6 +1,6 @@
 package eventstore
 
-import eventstore.RepositoryEventOps._
+import eventstore.RepositoryEventOps.*
 import eventstore.EventRepository.Direction.Backward
 import eventstore.EventRepository.LastEventToHandle.LastEvent
 import eventstore.EventRepository.LastEventToHandle.Version
@@ -15,15 +15,13 @@ import zio.ZIO
 import zio.durationInt
 import zio.stream.UStream
 import zio.stream.ZStream
-import zio.test.Assertion._
-import zio.test._
+import zio.test.Assertion.*
+import zio.test.*
 import zio.test.magnolia.DeriveGen
-
-import java.time.OffsetDateTime
-
-import types.{AggregateId, AggregateName, AggregateVersion, EventStoreVersion, EventStreamId, ProcessId}
+import types.{AggregateId, AggregateName, AggregateVersion, EventStoreVersion, EventStreamId}
 import EventRepository.Error.{Unexpected, VersionConflict}
 import EventRepository.{Direction, SaveEventError, Subscription}
+import eventstore.Generators.{aggregateNameGen, streamIdGen, versionGen}
 
 object EventRepositorySpec {
   case class User(id: String)
@@ -49,42 +47,6 @@ object EventRepositorySpec {
   case object C extends Event2
   case class D(foo: Boolean, bar: Int) extends Event2
 
-  implicit class WriteEventsOps[+E](
-      events: Seq[RepositoryEvent[E]]
-  ) {
-    def asRepositoryWriteEvents =
-      events.map(_.asRepositoryWriteEvent)
-  }
-  implicit class WriteEventOps[+E](
-      event: RepositoryEvent[E]
-  ) {
-    def asRepositoryWriteEvent =
-        RepositoryWriteEvent(
-          processId = event.processId,
-          aggregateId = event.aggregateId,
-          aggregateName = event.aggregateName,
-          aggregateVersion = event.aggregateVersion,
-          sentDate = event.sentDate,
-          event = event.event
-      )
-  }
-
-  val versionGen: Gen[Any, AggregateVersion] = {
-    Gen
-      .int(0, 20)
-      .map(version => 0.to(version).foldLeft(AggregateVersion.initial)((v, _) => v.next))
-  }
-  val aggregateIdGen: Gen[Any, AggregateId] =
-    Gen.uuid.map(id => AggregateId(id))
-  val aggregateNameGen: Gen[Any, AggregateName] =
-    Gen.alphaNumericString.map(name => AggregateName(name))
-  def streamIdGen(
-      nameGen: Gen[Any, AggregateName] = aggregateNameGen
-  ): Gen[Any, EventStreamId] = {
-    aggregateIdGen.zip(nameGen).map { case (id, name) =>
-      EventStreamId(id, name)
-    }
-  }
   val event1Gen: Gen[Any, Event1] = DeriveGen.gen[Event1].derive
   val event2Gen: Gen[Any, Event2] = DeriveGen.gen[Event2].derive
   val eventGen: Gen[Any, Event] = DeriveGen.gen[Event].derive
