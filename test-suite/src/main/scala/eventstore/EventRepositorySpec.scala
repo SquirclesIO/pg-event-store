@@ -544,38 +544,38 @@ object EventRepositorySpec {
             suite("getEventByStoreVersion")(
               test("getEventByStoreVersion should make any event findable by its store version") {
 
-                check(eventsGen(event1Gen, size1Gen = atLeastOne)) {
-                  case ((_, events, _)) =>
-                    ZIO
-                      .scoped {
-                        for {
-                          repository <- ZIO.service[EventRepository[Decoder, Encoder]]
-                          saved <- ZIO.foreach(events)(save)
-                          anySavedEvent <- pickRandomly(saved).runHead.some
-                          result <- repository.getEventByStoreVersion[Event](anySavedEvent.eventStoreVersion)
+                check(eventsGen(event1Gen, size1Gen = atLeastOne)) { case ((_, events, _)) =>
+                  ZIO
+                    .scoped {
+                      for {
+                        repository <- ZIO.service[EventRepository[Decoder, Encoder]]
+                        saved <- ZIO.foreach(events)(save)
+                        anySavedEvent <- pickRandomly(saved).runHead.some
+                        result <- repository.getEventByStoreVersion[Event](anySavedEvent.eventStoreVersion)
 
-                        } yield assert(result)(isSome(
+                      } yield assert(result)(
+                        isSome(
                           equalTo(anySavedEvent)
-                        ))
-                      }
-                      .provideSome[R](repository)
+                        )
+                      )
+                    }
+                    .provideSome[R](repository)
                 }
               },
               test("getEventByStoreVersion should return None when the store version doesn't exist") {
 
-                checkN(1)(eventsGen(event1Gen, size1Gen = atLeastOne)) {
-                  case ((_, events, _)) =>
-                    ZIO
-                      .scoped {
-                        for {
-                          repository <- ZIO.service[EventRepository[Decoder, Encoder]]
-                          saved <- ZIO.foreach(events)(save)
-                          lastEvent = saved.flatten.maxBy(_.eventStoreVersion)
-                          result <- repository.getEventByStoreVersion[Event](lastEvent.eventStoreVersion.next)
+                checkN(1)(eventsGen(event1Gen, size1Gen = atLeastOne)) { case ((_, events, _)) =>
+                  ZIO
+                    .scoped {
+                      for {
+                        repository <- ZIO.service[EventRepository[Decoder, Encoder]]
+                        saved <- ZIO.foreach(events)(save)
+                        lastEvent = saved.flatten.maxBy(_.eventStoreVersion)
+                        result <- repository.getEventByStoreVersion[Event](lastEvent.eventStoreVersion.next)
 
-                        } yield assert(result)(isNone)
-                      }
-                      .provideSome[R](repository)
+                      } yield assert(result)(isNone)
+                    }
+                    .provideSome[R](repository)
                 }
               }
             ),
@@ -796,7 +796,7 @@ object EventRepositorySpec {
                   result <- subscription.stream
                     .collect {
                       case e: RepositoryEvent[Event1] => e.asString
-                      case Reset                => "reset"
+                      case Reset                      => "reset"
                     }
                     .take(nbEvents2)
                     .timeout(1.seconds)
@@ -885,7 +885,7 @@ object EventRepositorySpec {
                     }
                     .collect {
                       case e: RepositoryEvent[Event1] => e.asString
-                      case Reset                => "reset"
+                      case Reset                      => "reset"
                     }
                     .take(nbEvents1 + nbEvents2 * 2 + 1)
                     .timeout(1.seconds)
@@ -936,7 +936,7 @@ object EventRepositorySpec {
                     }
                     .collect {
                       case e: RepositoryEvent[Event1] => e.asString
-                      case Reset                => "reset"
+                      case Reset                      => "reset"
                     }
                     .take(nbEvents1 + nbEvents2 * 2 + 1)
                     .timeout(1.seconds)
@@ -968,11 +968,11 @@ object EventRepositorySpec {
                     subscription.stream
                       .tap {
                         case Reset => repository.saveEvents(firstStreamId, events1)
-                        case _           => ZIO.unit
+                        case _     => ZIO.unit
                       }
                       .collect {
                         case e: RepositoryEvent[Event1] => e.asString
-                        case Reset                => "reset"
+                        case Reset                      => "reset"
                       }
                       .take(1L + events1.length)
                       .timeout(2.seconds)
@@ -1007,11 +1007,11 @@ object EventRepositorySpec {
                   result <- subscription.stream
                     .tap {
                       case Reset => repository.saveEvents(firstStreamId, events2)
-                      case _           => ZIO.unit
+                      case _     => ZIO.unit
                     }
                     .collect {
                       case e: RepositoryEvent[Event1] => e.asString
-                      case SwitchedToLive       => "switch"
+                      case SwitchedToLive             => "switch"
                     }
                     .sliding(3)
                     .collect { case c @ Chunk(_, "switch", _) => c }
@@ -1047,12 +1047,12 @@ object EventRepositorySpec {
                   result <- subscription.stream
                     .tap {
                       case Reset => repository.saveEvents(firstStreamId, events1)
-                      case _           => ZIO.unit
+                      case _     => ZIO.unit
                     }
                     .collect {
                       case e: RepositoryEvent[Event1] => e.asString
-                      case SwitchedToLive       => "switch"
-                      case Reset                => "reset"
+                      case SwitchedToLive             => "switch"
+                      case Reset                      => "reset"
                     }
                     .sliding(3)
                     .collect { case c @ Chunk("reset", "switch", _) => c }
@@ -1083,7 +1083,7 @@ object EventRepositorySpec {
                   subscription.stream
                     .collect {
                       case e: RepositoryEvent[Event1] => e.asString
-                      case Reset                => "reset"
+                      case Reset                      => "reset"
                     }
                     .take(1)
                     .timeout(1.seconds)
