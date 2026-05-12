@@ -1,5 +1,5 @@
 addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.6.1")
 addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.14.6")
-addSbtPlugin("org.typelevel" % "sbt-tpolecat" % "0.5.3")
+addSbtPlugin("org.typelevel" % "sbt-tpolecat" % "0.5.4")
 
 addSbtPlugin("com.github.sbt" % "sbt-ci-release" % "1.9.3")
