@@ -28,9 +28,9 @@ You can import the library implementation for `zio-json` with these lines
 
 [source]
 ----
-"immo.performance" % "pg-event-store-core" %% "0.0.26"
-"immo.performance" % "pg-event-store-postgres" %% "0.0.26"
-"immo.performance" % "pg-event-store-zio-json" %% "0.0.26"
+"immo.performance" % "pg-event-store-core" %% "0.0.28"
+"immo.performance" % "pg-event-store-postgres" %% "0.0.28"
+"immo.performance" % "pg-event-store-zio-json" %% "0.0.28"
 ----
 
 The main trait to use is `EventRepository` and there's a `ZLayer`
@@ -51,31 +51,31 @@ A few limitations are known and will be worked on in the future :
 
 Base types and traits
 
-`"immo.performance" % "pg-event-store-core" %% "0.0.26"`
+`"immo.performance" % "pg-event-store-core" %% "0.0.28"`
 
 === Postgres
 
 Implementation of traits using PostreSQL
 
-`"immo.performance" % "pg-event-store-postgres" %% "0.0.26"`
+`"immo.performance" % "pg-event-store-postgres" %% "0.0.28"`
 
 === Memory
 
 Implementation of traits using in-memory datastructures. Used mainly for testing.
 
-`"immo.performance" % "pg-event-store-memory" %% "0.0.26"`
+`"immo.performance" % "pg-event-store-memory" %% "0.0.28"`
 
 === ZIO-JSON
 
 Implementation of Codecs with https://github.com/zio/zio-json/[zio-json]
 
-`"immo.performance" % "pg-event-store-zio-json" %% "0.0.26"`
+`"immo.performance" % "pg-event-store-zio-json" %% "0.0.28"`
 
 === PLAY-JSON
 
 Implementation of Codecs with https://github.com/playframework/play-json[play-json]
 
-`"immo.performance" % "pg-event-store-play-json" %% "0.0.26"`
+`"immo.performance" % "pg-event-store-play-json" %% "0.0.28"`
 
 
 == License
