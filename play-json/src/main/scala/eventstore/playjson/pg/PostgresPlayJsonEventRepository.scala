@@ -1,5 +1,4 @@
 package eventstore.playjson.pg
-import doobie._
 import eventstore.EventRepository
 import eventstore.EventRepository.Error.Unexpected
 import eventstore.RepositoryEvent
@@ -7,6 +6,7 @@ import eventstore.RepositoryWriteEvent
 import eventstore.types.AggregateName
 import eventstore.types.EventStoreVersion
 import eventstore.types.EventStreamId
+import org.typelevel.doobie._
 import play.api.libs.json.Json
 import play.api.libs.json.Reads
 import play.api.libs.json.Writes

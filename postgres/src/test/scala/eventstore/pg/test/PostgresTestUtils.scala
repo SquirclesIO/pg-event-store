@@ -2,17 +2,18 @@ package eventstore.pg.test
 
 import com.dimafeng.testcontainers.PostgreSQLContainer
 import com.zaxxer.hikari.HikariConfig
-import doobie.Fragment
-import doobie.hikari.HikariTransactor
-import doobie.util.fragment
-import doobie.util.log.ExecFailure
-import doobie.util.log.LogHandler
-import doobie.util.log.Parameters
-import doobie.util.log.ProcessingFailure
-import doobie.util.log.Success
 import eventstore.pg.Postgres.DbConfig
 import eventstore.pg.Postgres.ZTransactor
 import org.testcontainers.utility.DockerImageName
+import org.typelevel.doobie
+import org.typelevel.doobie.Fragment
+import org.typelevel.doobie.hikari.HikariTransactor
+import org.typelevel.doobie.util.fragment
+import org.typelevel.doobie.util.log.ExecFailure
+import org.typelevel.doobie.util.log.LogHandler
+import org.typelevel.doobie.util.log.Parameters
+import org.typelevel.doobie.util.log.ProcessingFailure
+import org.typelevel.doobie.util.log.Success
 import zio.Random
 import zio.Scope
 import zio.Task
@@ -104,7 +105,7 @@ object PostgresTestUtils {
     }
   }
 
-  import doobie.implicits._
+  import org.typelevel.doobie.implicits._
   import zio.interop.catz._
 
   trait DbAdmin {

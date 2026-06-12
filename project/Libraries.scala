@@ -2,7 +2,7 @@ import sbt.*
 
 object Libraries {
   val zio_version = "2.1.26"
-  val doobie_version = "1.0.0-RC12"
+  val doobie_version = "1.0.0-RC13"
 
   val zio = Seq(
     "dev.zio" %% "zio" % zio_version,
@@ -21,9 +21,9 @@ object Libraries {
 
   val doobie = Seq(
     "dev.zio" %% "zio-interop-cats" % "23.1.0.13",
-    "org.tpolecat" %% "doobie-core" % doobie_version,
-    "org.tpolecat" %% "doobie-postgres" % doobie_version,
-    "org.tpolecat" %% "doobie-hikari" % doobie_version
+    "org.typelevel" %% "doobie-core" % doobie_version,
+    "org.typelevel" %% "doobie-postgres" % doobie_version,
+    "org.typelevel" %% "doobie-hikari" % doobie_version
   )
 
   val logback = Seq(

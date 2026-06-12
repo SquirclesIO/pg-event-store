@@ -1,10 +1,10 @@
 package eventstore.pg
 
 import cats.implicits.catsSyntaxTuple2Semigroupal
-import doobie._
 import eventstore._
 import eventstore.pg.test.PostgresTestUtils
 import eventstore.pg.test.PostgresTestUtils.DbAdmin
+import org.typelevel.doobie._
 import zio.Scope
 import zio.ULayer
 import zio.ZLayer

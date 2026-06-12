@@ -1,7 +1,5 @@
 package eventstore.ziojson.pg
 
-import doobie.Get
-import doobie.Put
 import eventstore.EventRepository
 import eventstore.EventRepository.Direction
 import eventstore.EventRepository.Error.Unexpected
@@ -11,6 +9,8 @@ import eventstore.RepositoryWriteEvent
 import eventstore.types.AggregateName
 import eventstore.types.EventStoreVersion
 import eventstore.types.EventStreamId
+import org.typelevel.doobie.Get
+import org.typelevel.doobie.Put
 import zio._
 import zio.json._
 import zio.stream.Stream

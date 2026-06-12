@@ -1,6 +1,6 @@
 package eventstore.pg
 
-import doobie.util.transactor
+import org.typelevel.doobie.util.transactor
 import zio.Task
 
 object Postgres {

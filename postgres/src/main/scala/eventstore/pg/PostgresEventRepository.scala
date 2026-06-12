@@ -2,11 +2,6 @@ package eventstore.pg
 
 import cats.data.EitherT
 import cats.implicits.catsSyntaxApplicativeId
-import doobie._
-import doobie.enumerated.TransactionIsolation
-import doobie.implicits._
-import doobie.postgres.implicits._
-import doobie.util.update.Update
 import eventstore.EventRepository
 import eventstore.EventRepository.Direction
 import eventstore.EventRepository.Error.Unexpected
@@ -24,6 +19,11 @@ import eventstore.types.AggregateVersion
 import eventstore.types.EventStoreVersion
 import eventstore.types.EventStreamId
 import eventstore.types.ProcessId
+import org.typelevel.doobie._
+import org.typelevel.doobie.enumerated.TransactionIsolation
+import org.typelevel.doobie.implicits._
+import org.typelevel.doobie.postgres.implicits._
+import org.typelevel.doobie.util.update.Update
 import zio._
 import zio.interop.catz._
 import zio.stream.Stream
