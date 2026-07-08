@@ -1,7 +1,6 @@
 import sbt.Keys.libraryDependencies
 import org.typelevel.sbt.tpolecat.DevMode
 import Libraries.*
-import xerial.sbt.Sonatype.sonatypeCentralHost
 
 val scala2Version = "2.13.18"
 val scala3Version = "3.3.8"
@@ -27,7 +26,6 @@ ThisBuild / developers := List(
 )
 ThisBuild / tpolecatDefaultOptionsMode := DevMode
 ThisBuild / scalafixOnCompile := false
-ThisBuild / sonatypeCredentialHost := sonatypeCentralHost
 
 addCommandAlias("lint", "scalafixAll; scalafmtAll; scalafmtSbt")
 addCommandAlias("check", "scalafmtCheckAll; scalafmtSbtCheck")
