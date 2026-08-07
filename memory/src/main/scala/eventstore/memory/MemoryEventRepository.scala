@@ -20,7 +20,10 @@ import scala.math.Ordered.orderingToOrdered
 
 import EventRepository.Error.Unexpected
 import EventRepository.Error.VersionConflict
-import EventRepository.{Direction, EventsOps, SaveEventError, Subscription}
+import EventRepository.Direction
+import EventRepository.EventsOps
+import EventRepository.SaveEventError
+import EventRepository.Subscription
 
 class MemoryEventRepository[UnusedDecoder[_], UnusedEncoder[_]](
     storageRef: TRef[Storage],

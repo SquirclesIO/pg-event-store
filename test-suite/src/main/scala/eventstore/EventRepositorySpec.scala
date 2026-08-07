@@ -1,9 +1,12 @@
 package eventstore
 
-import eventstore.RepositoryEventOps.*
 import eventstore.EventRepository.Direction.Backward
 import eventstore.EventRepository.LastEventToHandle.LastEvent
 import eventstore.EventRepository.LastEventToHandle.Version
+import eventstore.Generators.aggregateNameGen
+import eventstore.Generators.streamIdGen
+import eventstore.Generators.versionGen
+import eventstore.RepositoryEventOps._
 import zio.Chunk
 import zio.Random
 import zio.Ref
@@ -15,13 +18,20 @@ import zio.ZIO
 import zio.durationInt
 import zio.stream.UStream
 import zio.stream.ZStream
-import zio.test.Assertion.*
-import zio.test.*
+import zio.test.Assertion._
+import zio.test._
 import zio.test.magnolia.DeriveGen
-import types.{AggregateId, AggregateName, AggregateVersion, EventStoreVersion, EventStreamId}
-import EventRepository.Error.{Unexpected, VersionConflict}
-import EventRepository.{Direction, SaveEventError, Subscription}
-import eventstore.Generators.{aggregateNameGen, streamIdGen, versionGen}
+
+import types.AggregateId
+import types.AggregateName
+import types.AggregateVersion
+import types.EventStoreVersion
+import types.EventStreamId
+import EventRepository.Error.Unexpected
+import EventRepository.Error.VersionConflict
+import EventRepository.Direction
+import EventRepository.SaveEventError
+import EventRepository.Subscription
 
 object EventRepositorySpec {
   case class User(id: String)

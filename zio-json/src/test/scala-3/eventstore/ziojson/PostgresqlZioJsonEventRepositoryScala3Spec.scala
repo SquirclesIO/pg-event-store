@@ -1,6 +1,5 @@
 package eventstore.ziojson
 
-
 import eventstore.EventRepositorySpec.*
 import eventstore.Scala3Spec
 import eventstore.Scala3Spec.Union
@@ -41,7 +40,7 @@ object InMemoryZioJsonEventRepositoryScala3Spec extends ZIOSpecDefault {
   ) @@ TestAspect.timeout(1.minute)
 }
 
-object PostgresqlZioJsonEventRepositoryScala3Spec  extends ZIOSpec[DbAdmin] {
+object PostgresqlZioJsonEventRepositoryScala3Spec extends ZIOSpec[DbAdmin] {
 
   import Codecs.given
 
@@ -50,6 +49,5 @@ object PostgresqlZioJsonEventRepositoryScala3Spec  extends ZIOSpec[DbAdmin] {
   override val spec: Spec[TestEnvironment with DbAdmin with Scope, Any] = suite("postgres / zio-json")(
     Scala3Spec.spec(PostgresqlZioJsonEventRepositorySpec.layer)
   ) @@ TestAspect.timeout(2.minute) @@ TestAspect.parallelN(2)
-
 
 }

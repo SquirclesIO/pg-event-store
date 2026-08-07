@@ -1,6 +1,6 @@
-import sbt.Keys.libraryDependencies
-import org.typelevel.sbt.tpolecat.DevMode
 import Libraries.*
+import org.typelevel.sbt.tpolecat.DevMode
+import sbt.Keys.libraryDependencies
 
 val scala2Version = "2.13.18"
 val scala3Version = "3.3.8"
@@ -32,37 +32,36 @@ addCommandAlias("check", "scalafmtCheckAll; scalafmtSbtCheck")
 
 lazy val commonSettings = Seq(
   semanticdbEnabled := true,
-  semanticdbVersion := scalafixSemanticdb.revision
-)
-
-lazy val crossCompileSettings = Seq(
-  crossScalaVersions := Seq(scala2Version, scala3Version),
+  semanticdbVersion := scalafixSemanticdb.revision,
   Compile / scalacOptions ++= {
     CrossVersion.partialVersion(scalaVersion.value) match {
       case Some((2, _)) => Seq("-Xsource:3", "-Ymacro-annotations", "-Wconf:cat=scala3-migration:info")
       case _            => Nil
     }
-  }
+  },
+  scalafmtConfig := file(CrossVersion.partialVersion(scalaVersion.value) match {
+    case Some((2, _)) => ".scalafmt.conf"
+    case _            => ".scalafmt3.conf"
+  })
 )
 
-lazy val root = (project in file("."))
+lazy val root = (projectMatrix in file("."))
   .settings(name := "pg-event-store-root")
   .settings(commonSettings)
-  .settings(crossScalaVersions := Nil)
   .settings(Seq(publish / skip := true))
   .aggregate(core, `zio-json`, `play-json`, postgres, memory)
 
-lazy val core = (project in file("core"))
+lazy val core = (projectMatrix in file("core"))
   .settings(commonSettings)
-  .settings(crossCompileSettings)
+  .jvmPlatform(scalaVersions = Seq(scala3Version, scala2Version))
   .settings(
     name := "pg-event-store-core",
     libraryDependencies ++= zio ++ `zio-test`.asTest
   )
 
-lazy val `test-suite` = (project in file("test-suite"))
+lazy val `test-suite` = (projectMatrix in file("test-suite"))
   .settings(commonSettings)
-  .settings(crossCompileSettings)
+  .jvmPlatform(scalaVersions = Seq(scala3Version, scala2Version))
   .settings(
     name := "pg-event-store-test-suite",
     libraryDependencies ++= zio ++ `zio-test`
@@ -71,27 +70,27 @@ lazy val `test-suite` = (project in file("test-suite"))
     core % "compile->compile;compile->test"
   )
 
-lazy val postgres = (project in file("postgres"))
+lazy val postgres = (projectMatrix in file("postgres"))
   .settings(commonSettings)
-  .settings(crossCompileSettings)
+  .jvmPlatform(scalaVersions = Seq(scala3Version, scala2Version))
   .settings(
     name := "pg-event-store-postgres",
     libraryDependencies ++= zio ++ `zio-test`.asTest ++ doobie ++ `postgres-test-container`.asTest ++ logback.asTest
   )
   .dependsOn(core, `test-suite` % Test)
 
-lazy val memory = (project in file("memory"))
+lazy val memory = (projectMatrix in file("memory"))
   .settings(commonSettings)
-  .settings(crossCompileSettings)
+  .jvmPlatform(scalaVersions = Seq(scala3Version, scala2Version))
   .settings(
     name := "pg-event-store-memory",
     libraryDependencies ++= zio ++ `zio-test`.asTest
   )
   .dependsOn(core, `test-suite` % Test)
 
-lazy val `zio-json` = (project in file("zio-json"))
+lazy val `zio-json` = (projectMatrix in file("zio-json"))
   .settings(commonSettings)
-  .settings(crossCompileSettings)
+  .jvmPlatform(scalaVersions = Seq(scala3Version, scala2Version))
   .settings(
     name := "pg-event-store-zio-json",
     libraryDependencies ++= zio ++ `zio-test`.asTest ++ `zio-json-libs`
@@ -103,9 +102,9 @@ lazy val `zio-json` = (project in file("zio-json"))
     memory % Test
   )
 
-lazy val `play-json` = (project in file("play-json"))
+lazy val `play-json` = (projectMatrix in file("play-json"))
   .settings(commonSettings)
-  .settings(crossScalaVersions := Seq(scala2Version))
+  .jvmPlatform(scalaVersions = Seq(scala2Version))
   .settings(
     name := "pg-event-store-play-json",
     libraryDependencies ++= zio ++ `zio-test`.asTest ++ `play-json-libs`
