@@ -38,11 +38,7 @@ lazy val commonSettings = Seq(
       case Some((2, _)) => Seq("-Xsource:3", "-Ymacro-annotations", "-Wconf:cat=scala3-migration:info")
       case _            => Nil
     }
-  },
-  scalafmtConfig := file(CrossVersion.partialVersion(scalaVersion.value) match {
-    case Some((2, _)) => ".scalafmt.conf"
-    case _            => ".scalafmt3.conf"
-  })
+  }
 )
 
 lazy val root = (projectMatrix in file("."))
