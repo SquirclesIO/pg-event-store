@@ -5,27 +5,27 @@ import Libraries.*
 val scala2Version = "2.13.18"
 val scala3Version = "3.3.8"
 
-ThisBuild / scalaVersion := scala2Version
-ThisBuild / homepage := Some(url("https://github.com/PerformanceIMMO/pg-event-store"))
-ThisBuild / licenses := List("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0"))
-ThisBuild / organization := "immo.performance"
-ThisBuild / organizationName := "Performance IMMO"
-ThisBuild / developers := List(
+scalaVersion := scala2Version
+homepage := Some(uri("https://github.com/PerformanceIMMO/pg-event-store"))
+licenses := List("Apache-2.0" -> uri("http://www.apache.org/licenses/LICENSE-2.0"))
+organization := "immo.performance"
+organizationName := "Performance IMMO"
+developers := List(
   Developer(
     id = "mbaechler",
     name = "Matthieu Baechler",
     email = "matthieu@baechler-craftsmanship.fr",
-    url = url("https://baechler-craftsmanship.fr/")
+    url = uri("https://baechler-craftsmanship.fr/")
   ),
   Developer(
     id = "ubourdon",
     name = "Ugo Bourdon",
     email = "bourdon.ugo@gmail.com",
-    url = url("http://demon-agile.blogspot.com/")
+    url = uri("http://demon-agile.blogspot.com/")
   )
 )
 ThisBuild / tpolecatDefaultOptionsMode := DevMode
-ThisBuild / scalafixOnCompile := false
+scalafixOnCompile := false
 
 addCommandAlias("lint", "scalafixAll; scalafmtAll; scalafmtSbt")
 addCommandAlias("check", "scalafmtCheckAll; scalafmtSbtCheck")

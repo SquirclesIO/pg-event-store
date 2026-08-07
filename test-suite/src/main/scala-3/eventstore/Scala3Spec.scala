@@ -2,6 +2,7 @@ package eventstore
 
 import eventstore.EventRepositorySpec.{A, Codecs, Event, Event1, Event2, eventsGen, event1Gen, doneBy1Gen, event2Gen, doneBy2Gen, DoneBy, DoneBy1, DoneBy2, Bob}
 import eventstore.types.{AggregateId, AggregateName, EventStreamId, AggregateVersion}
+import eventstore.RepositoryEventOps.*
 import zio.test.*
 import zio.test.Assertion.*
 import zio.{TagK, URLayer, ZIO, durationInt}
