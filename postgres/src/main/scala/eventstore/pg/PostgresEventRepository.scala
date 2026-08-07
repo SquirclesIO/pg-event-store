@@ -35,6 +35,7 @@ import java.sql.Savepoint
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
+import scala.math.Ordering.Implicits.infixOrderingOps
 
 class PostgresEventRepositoryLive(
     transactor: ZTransactor,
@@ -102,8 +103,19 @@ class PostgresEventRepositoryLive(
     for {
       fromVersion <- getAllEventImpl[EventType](query = Req.listAllFromVersion(fromExclusive))
       live <- fromHub[EventType]
-      switchableStream <- SwitchableZStream.from(fromVersion.concat(live), fromDb)
+      switchableStream <- SwitchableZStream.from(fromVersion.concatIgnoringDuplicateElements(live), fromDb)
     } yield Subscription.fromSwitchableStream(switchableStream, getLastEventVersion)
+  }
+
+  implicit class StreamDeduplicateOps[R, E, A](self: ZStream[R, E, RepositoryEvent[A]]) {
+    def concatIgnoringDuplicateElements(stream: ZStream[R, E, RepositoryEvent[A]]) =
+      ZStream.unwrap {
+        for {
+          lastFromDb <- Ref.make(EventStoreVersion.initial)
+        } yield self
+          .tap(event => lastFromDb.set(event.eventStoreVersion))
+          .concat(stream.dropWhileZIO(event => lastFromDb.get.map(l => event.eventStoreVersion <= l)))
+      }
   }
 
   override def getAllEvents[A: Get: Tag]: ZIO[Scope, Nothing, Stream[Unexpected, RepositoryEvent[A]]] =

@@ -820,36 +820,62 @@ object EventRepositorySpec {
           implicit val implicitEvent1Encoder: Encoder[Event1] = codecs.event1Encoder
           implicit val implicitEvent1Decoder: Decoder[Event1] = codecs.event1Decoder
 
-          check(eventsGen3(event1Gen, size2Gen = atLeastOne)) { case (firstStreamId, events1, events2, events3) =>
-            val nbEvents1 = events1.length.toLong
-            val nbEvents2 = events2.length.toLong
-            val nbEvents3 = events3.length.toLong
+          check(eventsGen3(event1Gen, size1Gen = atLeastOne, size2Gen = atLeastOne)) {
+            case (firstStreamId, events1, events2, events3) =>
+              val nbEvents1 = events1.length.toLong
+              val nbEvents2 = events2.length.toLong
+              val nbEvents3 = events3.length.toLong
+              ZIO
+                .scoped(
+                  for {
+                    repository <- ZIO.service[EventRepository[Decoder, Encoder]]
+                    fromVersion <- repository.saveEvents(firstStreamId, events1).map(_.last.eventStoreVersion)
+                    _ <- repository.saveEvents(firstStreamId, events2)
+                    subscription <- repository.listenFromVersion[Event1](fromExclusive = fromVersion)
+                    _ <- repository.saveEvents(firstStreamId, events3)
+                    lastKnownVersionForEvents2 <- repository
+                      .getAllEvents[Event1]
+                      .flatMap(_.runLast)
+                      .map(_.map(_.eventStoreVersion).getOrElse(EventStoreVersion.initial))
+
+                    result <- subscription.stream
+                      .collect { case e: RepositoryEvent[Event1] => e }
+                      .take(nbEvents1 + nbEvents2 * 2 + nbEvents3 * 2)
+                      .tap(event =>
+                        ZIO.when(event.eventStoreVersion == lastKnownVersionForEvents2)(
+                          subscription.restartFromFirstEvent(Version(lastKnownVersionForEvents2))
+                        )
+                      )
+                      .timeout(1.seconds)
+                      .runCollect
+                  } yield assert(result.toList.asRepositoryWriteEvents)(
+                    equalTo(events2 ++ events3 ++ events1 ++ events2 ++ events3)
+                  )
+                )
+                .provideSome[R](repository)
+          }
+        },
+        test("should stream events when writing while listening from beginning") {
+          implicit val implicitEvent1Encoder: Encoder[Event1] = codecs.event1Encoder
+          implicit val implicitEvent1Decoder: Decoder[Event1] = codecs.event1Decoder
+
+          check(eventsGen(event1Gen)) { case (firstStreamId, events1, _) =>
             ZIO
               .scoped(
                 for {
                   repository <- ZIO.service[EventRepository[Decoder, Encoder]]
-                  fromVersion <- repository.saveEvents(firstStreamId, events1).map(_.last.eventStoreVersion)
-                  _ <- repository.saveEvents(firstStreamId, events2)
-                  subscription <- repository.listenFromVersion[Event1](fromExclusive = fromVersion)
-                  _ <- repository.saveEvents(firstStreamId, events3)
-                  lastKnownVersionForEvents2 <- repository
-                    .getAllEvents[Event1]
-                    .flatMap(_.runLast)
-                    .map(_.map(_.eventStoreVersion).getOrElse(EventStoreVersion.initial))
+                  _ <- ZStream
+                    .fromIterable(events1.map(firstStreamId -> _))
+                    .runForeach { case (streamId, event) => repository.saveEvents(streamId, Seq(event)) }
+                    .fork
 
+                  subscription <- repository.listenFromVersion[Event1](fromExclusive = EventStoreVersion.initial)
                   result <- subscription.stream
                     .collect { case e: RepositoryEvent[Event1] => e }
-                    .take(nbEvents1 + nbEvents2 * 2 + nbEvents3 * 2)
-                    .tap(event =>
-                      ZIO.when(event.eventStoreVersion == lastKnownVersionForEvents2)(
-                        subscription.restartFromFirstEvent(Version(lastKnownVersionForEvents2))
-                      )
-                    )
-                    .timeout(1.seconds)
+                    .take(events1.length.toLong)
                     .runCollect
-                } yield assert(result.toList.asRepositoryWriteEvents)(
-                  equalTo(events2 ++ events3 ++ events1 ++ events2 ++ events3)
-                )
+
+                } yield assert(result.toList.asRepositoryWriteEvents)(hasSameElements(events1))
               )
               .provideSome[R](repository)
           }
