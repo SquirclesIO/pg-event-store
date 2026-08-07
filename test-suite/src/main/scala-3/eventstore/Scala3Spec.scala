@@ -1,19 +1,38 @@
 package eventstore
 
-import eventstore.EventRepositorySpec.{A, Codecs, Event, Event1, Event2, eventsGen, event1Gen, doneBy1Gen, event2Gen, doneBy2Gen, DoneBy, DoneBy1, DoneBy2, Bob}
-import eventstore.types.{AggregateId, AggregateName, EventStreamId, AggregateVersion}
+import eventstore.EventRepositorySpec.A
+import eventstore.EventRepositorySpec.Bob
+import eventstore.EventRepositorySpec.Codecs
+import eventstore.EventRepositorySpec.DoneBy
+import eventstore.EventRepositorySpec.DoneBy1
+import eventstore.EventRepositorySpec.DoneBy2
+import eventstore.EventRepositorySpec.Event
+import eventstore.EventRepositorySpec.Event1
+import eventstore.EventRepositorySpec.Event2
+import eventstore.EventRepositorySpec.doneBy1Gen
+import eventstore.EventRepositorySpec.doneBy2Gen
+import eventstore.EventRepositorySpec.event1Gen
+import eventstore.EventRepositorySpec.event2Gen
+import eventstore.EventRepositorySpec.eventsGen
 import eventstore.RepositoryEventOps.*
+import eventstore.types.AggregateId
+import eventstore.types.AggregateName
+import eventstore.types.AggregateVersion
+import eventstore.types.EventStreamId
+import zio.TagK
+import zio.URLayer
+import zio.ZIO
+import zio.durationInt
 import zio.test.*
 import zio.test.Assertion.*
-import zio.{TagK, URLayer, ZIO, durationInt}
 
 object Scala3Spec {
 
   type Union = (Event1, DoneBy1) | (Event2, DoneBy2)
 
   def spec[R, Decoder[_]: TagK, Encoder[_]: TagK](
-                                                   repository: URLayer[R, EventRepository[Decoder, Encoder]]
-                                                 )(implicit codecs: Codecs[Decoder, Encoder], unionDecoder: Decoder[Union], unionEncoder: Encoder[Union]) = {
+      repository: URLayer[R, EventRepository[Decoder, Encoder]]
+  )(implicit codecs: Codecs[Decoder, Encoder], unionDecoder: Decoder[Union], unionEncoder: Encoder[Union]) = {
 
     given Decoder[(Event, DoneBy)] = codecs.eventWithDoneByDecoder
     given Decoder[(Event1, DoneBy1)] = codecs.event1WithDoneBy1Decoder
@@ -52,25 +71,29 @@ object Scala3Spec {
         }
       }.provideSome[R](repository),
       test("getEventStream should return appended events with user") {
-          val generator =
-            for (streamId, eventsA, _) <- eventsGen(event1Gen <*> doneBy1Gen, size1Gen = Gen.int(1, 20))
-                version = eventsA.lastOption.map(_.aggregateVersion).getOrElse(AggregateVersion.initial)
-                (_, eventsD, _) <- eventsGen(event2Gen <*> doneBy2Gen, fromVersion = version.next)
-            yield (streamId, eventsA, eventsD.map(_.copy(aggregateId = streamId.aggregateId, aggregateName = streamId.aggregateName)))
+        val generator =
+          for
+            (streamId, eventsA, _) <- eventsGen(event1Gen <*> doneBy1Gen, size1Gen = Gen.int(1, 20))
+            version = eventsA.lastOption.map(_.aggregateVersion).getOrElse(AggregateVersion.initial)
+            (_, eventsD, _) <- eventsGen(event2Gen <*> doneBy2Gen, fromVersion = version.next)
+          yield (
+            streamId,
+            eventsA,
+            eventsD.map(_.copy(aggregateId = streamId.aggregateId, aggregateName = streamId.aggregateName))
+          )
 
-          check(generator) { case (streamId, events1, events2) =>
-            (ZIO.scoped (for {
+        check(generator) { case (streamId, events1, events2) =>
+          (ZIO
+            .scoped(for {
               repository <- ZIO.service[EventRepository[Decoder, Encoder]]
               _ <- repository.saveEvents[(Event1, DoneBy1)](streamId, events1)
               _ <- repository.saveEvents[(Event2, DoneBy2)](streamId, events2)
               stream <- repository.getEventStream[Union](streamId)
               result <- stream.runCollect
             } yield assert(result.asRepositoryWriteEvents)(equalTo(events1 ++ events2))))
-              .provideSome[R](repository)
-          }
+            .provideSome[R](repository)
         }
-
-
+      }
     ) @@ TestAspect.samples(10) @@ TestAspect.shrinks(0)
   }
 }

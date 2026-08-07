@@ -1,12 +1,12 @@
 package eventstore.memory
 
+import eventstore.EventRepositorySpec.Codecs
 import eventstore.Scala3Spec
+import eventstore.Scala3Spec.Union
 import eventstore.memory.MemoryEventRepository.Id
 import zio.Scope
 import zio.durationInt
-import eventstore.EventRepositorySpec.Codecs
 import zio.test.*
-import eventstore.Scala3Spec.Union
 
 object MemoryEventRepositoryScala3Spec extends ZIOSpecDefault {
 

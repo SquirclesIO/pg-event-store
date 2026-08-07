@@ -15,7 +15,9 @@ import zio._
 import zio.stream.Stream
 import zio.stream.ZStream
 
-import EventRepository.{Direction, Error, Subscription}
+import EventRepository.Direction
+import EventRepository.Error
+import EventRepository.Subscription
 
 private class PostgresPlayJsonEventRepository(
     postgresEventRepositoryLive: EventRepository[Get, Put]

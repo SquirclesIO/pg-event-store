@@ -22,11 +22,11 @@ object UnionCodec:
             out.write("}")
           else aEncoder.unsafeEncode(a.asInstanceOf[A], indent, out)
         else if bTag.tag.decomposeUnion.sizeIs == 1
-          then
-            out.write(s"""{"${bTag.closestClass.getSimpleName}":""")
-            bEncoder.unsafeEncode(a.asInstanceOf[B], indent, out)
-            out.write("}")
-          else bEncoder.unsafeEncode(a.asInstanceOf[B], indent, out)
+        then
+          out.write(s"""{"${bTag.closestClass.getSimpleName}":""")
+          bEncoder.unsafeEncode(a.asInstanceOf[B], indent, out)
+          out.write("}")
+        else bEncoder.unsafeEncode(a.asInstanceOf[B], indent, out)
       }
     }
 

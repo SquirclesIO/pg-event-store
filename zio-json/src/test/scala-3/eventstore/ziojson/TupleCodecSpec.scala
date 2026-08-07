@@ -45,7 +45,6 @@ object F:
   given JsonDecoder[F] = DeriveJsonDecoder.gen[F]
   given JsonEncoder[F] = DeriveJsonEncoder.gen[F]
 
-
 enum G:
   case GA(vA: Int)
   case GB(vB: String, vC: Int)
@@ -59,7 +58,6 @@ enum H:
 object H:
   given JsonDecoder[H] = DeriveJsonDecoder.gen[H]
   given JsonEncoder[H] = DeriveJsonEncoder.gen[H]
-
 
 object TupleCodecSpec extends ZIOSpecDefault:
 
@@ -168,10 +166,11 @@ object UnionCodecSpec extends ZIOSpecDefault:
       test("should decode (E, G) with type (E, G)|(F, H)") {
         given JsonDecoder[(E, G)] = JsonDecoder.tuple2[E, G]
         given JsonDecoder[(F, H)] = JsonDecoder.tuple2[F, H]
-        given JsonDecoder[(E, G)|(F, H)] = UnionCodec.sumTypeDecoder[(E, G), (F, H)]
+        given JsonDecoder[(E, G) | (F, H)] = UnionCodec.sumTypeDecoder[(E, G), (F, H)]
 
-        assert("""[{"EB":{"vB":"blabla","vC":12}},{"GA":{"vA": 3}}]""".fromJson[(E, G)|(F, H)])(isRight(equalTo((EB(vB = "blabla", vC = 12), GA(vA = 3)))))
+        assert("""[{"EB":{"vB":"blabla","vC":12}},{"GA":{"vA": 3}}]""".fromJson[(E, G) | (F, H)])(
+          isRight(equalTo((EB(vB = "blabla", vC = 12), GA(vA = 3))))
+        )
       }
     )
-
   )
