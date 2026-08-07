@@ -145,11 +145,12 @@ object PostgresTestUtils {
 
   private val transactorWithSchema = transactorLayer.tap { transactor =>
     ZIO
-      .readFile(
-        getClass.getClassLoader
-          .getResource("sql_schemas/events.sql")
-          .getPath
-      )
+      .scoped {
+        ZIO
+          .attemptBlockingIO(scala.io.Source.fromResource("sql_schemas/events.sql"))
+          .withFinalizer { s => ZIO.attemptBlocking(s.close()).orDie }
+          .flatMap { s => ZIO.attemptBlockingIO(s.mkString) }
+      }
       .map(fragment.Fragment.const(_))
       .flatMap(script => script.update.run.transact(transactor.get))
   }.orDie
