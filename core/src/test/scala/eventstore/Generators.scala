@@ -17,7 +17,7 @@ object Generators {
     Gen.uuid.map(id => AggregateId(id))
 
   val aggregateNameGen: Gen[Any, AggregateName] =
-    Gen.alphaNumericString.map(name => AggregateName(name))
+    Gen.alphaNumericString.filter(_.nonEmpty).map(name => AggregateName(name))
 
   def streamIdGen(
       nameGen: Gen[Any, AggregateName] = aggregateNameGen
