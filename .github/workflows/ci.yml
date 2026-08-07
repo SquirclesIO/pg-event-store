@@ -61,7 +61,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     needs: [ci]
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'release'
     steps:
       - name: Checkout
         uses: actions/checkout@v6
