@@ -82,6 +82,9 @@ private class PostgresZioJsonEventRepository(
       direction: Direction = Direction.Forward
   ): ZStream[Any, Unexpected, EventStreamId] =
     postgresEventRepositoryLive.listEventStreamWithName(aggregateName, direction)
+
+  override def getLastEventStoreVersion: IO[Unexpected, Option[EventStoreVersion]] =
+    postgresEventRepositoryLive.getLastEventStoreVersion
 }
 
 object PostgresZioJsonEventRepository {

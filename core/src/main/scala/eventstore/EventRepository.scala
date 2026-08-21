@@ -98,6 +98,8 @@ object EventRepository {
 
 trait EventRepository[Decoder[_], Encoder[_]] {
 
+  def getLastEventStoreVersion: IO[Unexpected, Option[EventStoreVersion]]
+
   def getAllEvents[A: Decoder: Tag]: ZIO[Scope, Nothing, Stream[Unexpected, RepositoryEvent[A]]]
 
   def getEventByStoreVersion[A: Decoder: Tag](

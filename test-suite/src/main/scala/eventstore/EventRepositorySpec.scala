@@ -610,7 +610,7 @@ object EventRepositorySpec {
                 }
               },
               test(
-                "getAllEvents should list events in the same ordering than listen"
+                "getAllEvents should list events in the same order than listen"
               ) {
                 implicit val implicitEventDecoder: Decoder[Event] = codecs.eventDecoder
 
@@ -787,6 +787,31 @@ object EventRepositorySpec {
               }
               .provideSome[R](repository)
           }
+        }
+      ),
+      suite("getLastEventStoreVersion")(
+        test("should return the same version as the last event from saveEvents") {
+          implicit val implicitEvent1Encoder: Encoder[Event1] = codecs.event1Encoder
+          implicit val implicitEvent1Decoder: Decoder[Event1] = codecs.event1Decoder
+
+          check(eventsGen(event1Gen, size1Gen = atLeastOne)) { case (firstStreamId, events1, _) =>
+            ZIO
+              .scoped(
+                for {
+                  repository <- ZIO.service[EventRepository[Decoder, Encoder]]
+                  versionFromSave <- repository.saveEvents(firstStreamId, events1).map(_.last.eventStoreVersion)
+                  actual <- repository.getLastEventStoreVersion
+                } yield assert(actual)(isSome(equalTo(versionFromSave)))
+              )
+              .provideSome[R](repository)
+          }
+        },
+        test("should return None when no event yet") {
+          (for {
+            repository <- ZIO.service[EventRepository[Decoder, Encoder]]
+            actual <- repository.getLastEventStoreVersion
+          } yield assert(actual)(isNone))
+            .provideSome[R](repository)
         }
       ),
       suite("listenFromVersion Spec - for projections keeping track of events offsets")(
