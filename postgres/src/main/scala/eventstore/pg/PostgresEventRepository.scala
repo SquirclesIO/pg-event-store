@@ -79,7 +79,7 @@ class PostgresEventRepositoryLive(
       live <- fromHub[EventType]
       fromDb = getAllEvents[EventType]
       switchableStream <- SwitchableZStream.from(live, fromDb)
-    } yield Subscription.fromSwitchableStream(switchableStream, getLastEventVersion)
+    } yield Subscription.fromSwitchableStream(switchableStream, getLastEventStoreVersion)
 
   private def fromHub[EventType: Tag]: ZIO[Scope, Nothing, ZStream[Any, Nothing, RepositoryEvent[EventType]]] =
     for {
@@ -104,7 +104,7 @@ class PostgresEventRepositoryLive(
       fromVersion <- getAllEventImpl[EventType](query = Req.listAllFromVersion(fromExclusive))
       live <- fromHub[EventType]
       switchableStream <- SwitchableZStream.from(fromVersion.concatIgnoringDuplicateElements(live), fromDb)
-    } yield Subscription.fromSwitchableStream(switchableStream, getLastEventVersion)
+    } yield Subscription.fromSwitchableStream(switchableStream, getLastEventStoreVersion)
   }
 
   implicit class StreamDeduplicateOps[R, E, A](self: ZStream[R, E, RepositoryEvent[A]]) {
@@ -159,6 +159,13 @@ class PostgresEventRepositoryLive(
       .tapErrorCause(ZIO.logErrorCause("listEventStreamWithName", _))
       .mapError(Unexpected.apply)
 
+  override def getLastEventStoreVersion: IO[Unexpected, Option[EventStoreVersion]] =
+    Req.selectLastEventStoreVersion
+      .query[Option[EventStoreVersion]]
+      .unique
+      .transact(transactor)
+      .mapError { Unexpected.apply }
+
   private def transactionalSave[E: Get: Put: Tag](
       eventStreamId: EventStreamId,
       writeEvents: Seq[RepositoryWriteEvent[E]]
@@ -190,13 +197,6 @@ class PostgresEventRepositoryLive(
         .attemptSql
     }
       .leftMap[SaveEventError](Unexpected.apply)
-
-  private def getLastEventVersion: IO[Unexpected, Option[EventStoreVersion]] =
-    Req.selectLastEventStoreVersion
-      .query[Option[EventStoreVersion]]
-      .unique
-      .transact(transactor)
-      .mapError { Unexpected.apply }
 
   private def insertEvents[E: Get: Put: Tag](
       eventStreamId: EventStreamId,

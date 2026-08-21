@@ -111,7 +111,7 @@ class MemoryEventRepository[UnusedDecoder[_], UnusedEncoder[_]](
     for {
       live <- live
       switchableStream <- SwitchableZStream.from(live, fromDb)
-    } yield Subscription.fromSwitchableStream(switchableStream, getLastEventVersion)
+    } yield Subscription.fromSwitchableStream(switchableStream, getLastEventStoreVersion)
   }
 
   private def fromHub[EventType: UnusedDecoder: Tag]
@@ -129,7 +129,7 @@ class MemoryEventRepository[UnusedDecoder[_], UnusedEncoder[_]](
 
   }
 
-  private def getLastEventVersion: IO[Unexpected, Option[EventStoreVersion]] =
+  def getLastEventStoreVersion: IO[Unexpected, Option[EventStoreVersion]] =
     storageRef.get.map(_.events.lastOption.map(_.eventStoreVersion)).commit
 
 }
