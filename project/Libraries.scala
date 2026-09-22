@@ -31,7 +31,7 @@ object Libraries {
   )
 
   val `play-json-libs` = Seq(
-    "com.typesafe.play" %% "play-json" % "2.10.8",
+    "org.playframework" %% "play-json" % "3.0.6",
     "org.julienrf" %% "play-json-derived-codecs" % "7.0.0"
   )
 
