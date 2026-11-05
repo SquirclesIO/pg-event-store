@@ -39,6 +39,8 @@ object Scala3Spec {
     given Decoder[(Event2, DoneBy2)] = codecs.event2WithDoneBy2Decoder
     given Encoder[(Event1, DoneBy1)] = codecs.event1WithDoneBy1Encoder
     given Encoder[(Event2, DoneBy2)] = codecs.event2WithDoneBy2Encoder
+    given Encoder[Unit] = codecs.metadataEncoder
+    given Decoder[Unit] = codecs.metadataDecoder
 
     suite("scala 3 examples")(
       test("should dispatch events to all listeners with union type listen") {
@@ -46,10 +48,10 @@ object Scala3Spec {
           Live.live {
             for {
               repository <- ZIO.service[EventRepository[Decoder, Encoder]]
-              listener1 <- repository.listen[(Event1, DoneBy1)].map(_.events)
-              listener2 <- repository.listen[Union].map(_.events)
-              listener3 <- repository.listen[(Event, DoneBy)].map(_.events)
-              listener4 <- repository.listen[(Event2, DoneBy2)].map(_.events)
+              listener1 <- repository.listen[(Event1, DoneBy1), Unit].map(_.events)
+              listener2 <- repository.listen[Union, Unit].map(_.events)
+              listener3 <- repository.listen[(Event, DoneBy), Unit].map(_.events)
+              listener4 <- repository.listen[(Event2, DoneBy2), Unit].map(_.events)
               streamId <- AggregateId.generate.map(aggregateId => {
                 EventStreamId(
                   aggregateId = aggregateId,
@@ -86,9 +88,9 @@ object Scala3Spec {
           (ZIO
             .scoped(for {
               repository <- ZIO.service[EventRepository[Decoder, Encoder]]
-              _ <- repository.saveEvents[(Event1, DoneBy1)](streamId, events1)
-              _ <- repository.saveEvents[(Event2, DoneBy2)](streamId, events2)
-              stream <- repository.getEventStream[Union](streamId)
+              _ <- repository.saveEvents[(Event1, DoneBy1), Unit](streamId, events1)
+              _ <- repository.saveEvents[(Event2, DoneBy2), Unit](streamId, events2)
+              stream <- repository.getEventStream[Union, Unit](streamId)
               result <- stream.runCollect
             } yield assert(result.asRepositoryWriteEvents)(equalTo(events1 ++ events2))))
             .provideSome[R](repository)

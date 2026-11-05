@@ -12,7 +12,7 @@ object RepositoryEventSpec extends ZIOSpecDefault {
   case class TypeB()
   class SubTypeA() extends TypeA()
 
-  def eventsGen[EventType: Tag](eventType: EventType): Gen[Any, RepositoryEvent[EventType]] =
+  def eventsGen[EventType: Tag](eventType: EventType): Gen[Any, RepositoryEvent[EventType, Unit]] =
     streamIdGen().mapZIO(streamId => eventType.asRepositoryEvent(streamId = streamId))
 
   def spec: Spec[TestEnvironment, Nothing] = suite("RepositoryEventSpec")(

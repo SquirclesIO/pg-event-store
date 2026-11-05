@@ -64,7 +64,9 @@ object ZioJsonCodecs {
     event2WithDoneBy2Decoder = event2WithDoneBy2Codec.decoder,
     eventWithDoneByDecoder = eventWithDoneByCodec.decoder,
     eventWithUserEncoder = eventWithUserCodec.encoder,
-    eventWithUserDecoder = eventWithUserCodec.decoder
+    eventWithUserDecoder = eventWithUserCodec.decoder,
+    metadataEncoder = JsonEncoder.string.contramap(_ => ""),
+    metadataDecoder = JsonDecoder.string.map(_ => ())
   )
 
 }

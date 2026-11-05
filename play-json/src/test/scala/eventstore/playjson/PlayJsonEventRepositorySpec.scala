@@ -74,7 +74,9 @@ object PlayJsonCodecs {
     event2WithDoneBy2Decoder = event2WithDoneBy2Codec,
     eventWithDoneByDecoder = eventWithDoneByCodec,
     eventWithUserEncoder = eventWithUserCodec,
-    eventWithUserDecoder = eventWithUserCodec
+    eventWithUserDecoder = eventWithUserCodec,
+    metadataEncoder = Writes.StringWrites.contramap(_ => ""),
+    metadataDecoder = Reads.JsStringReads.map(_ => ()),
   )
 
 }

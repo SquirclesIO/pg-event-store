@@ -210,7 +210,9 @@ object PostgresRawCodecs {
     event2WithDoneBy2Decoder = event2WithDoneBy2JsonGet,
     eventWithDoneByDecoder = eventWithDoneByJsonGet,
     eventWithUserEncoder = eventWithUserJsonPut,
-    eventWithUserDecoder = eventWithUserJsonGet
+    eventWithUserDecoder = eventWithUserJsonGet,
+    metadataEncoder = Put[String].contramap(_ => ""),
+    metadataDecoder = Get[String].map(_ => ()),
   )
 
 }
