@@ -7,6 +7,7 @@ import eventstore.EventRepository.Direction
 import eventstore.EventRepository.Error.Unexpected
 import eventstore.EventRepository.Error.VersionConflict
 import eventstore.EventRepository.EventsOps
+import eventstore.EventRepository.FromVersion
 import eventstore.EventRepository.SaveEventError
 import eventstore.EventRepository.Subscription
 import eventstore.RepositoryEvent
@@ -96,12 +97,17 @@ class PostgresEventRepositoryLive(
     }
 
   override def listenFromVersion[EventType: Get: Tag](
-      fromExclusive: EventStoreVersion
+      from: FromVersion
   ): ZIO[Scope, Unexpected, Subscription[EventType]] = {
     val fromDb = getAllEvents[EventType]
+    val query = from match {
+      case FromVersion.Exclusive(version) => Req.listAllFromVersionExclusive(version)
+      case FromVersion.Inclusive(version) => Req.listAllFromVersionInclusive(version)
+      case FromVersion.Initial            => Req.listAll
+    }
 
     for {
-      fromVersion <- getAllEventImpl[EventType](query = Req.listAllFromVersion(fromExclusive))
+      fromVersion <- getAllEventImpl[EventType](query = query)
       live <- fromHub[EventType]
       switchableStream <- SwitchableZStream.from(fromVersion.concatIgnoringDuplicateElements(live), fromDb)
     } yield Subscription.fromSwitchableStream(switchableStream, getLastEventStoreVersion)
@@ -322,8 +328,11 @@ private object Req {
   def listAll: Fragment =
     selectEvent(whereOpt = None)
 
-  def listAllFromVersion(eventStoreVersion: EventStoreVersion): Fragment =
+  def listAllFromVersionExclusive(eventStoreVersion: EventStoreVersion): Fragment =
     selectEvent(whereOpt = Some(sql"""eventStoreVersion > $eventStoreVersion"""))
+
+  def listAllFromVersionInclusive(eventStoreVersion: EventStoreVersion): Fragment =
+    selectEvent(whereOpt = Some(sql"""eventStoreVersion >= $eventStoreVersion"""))
 
   def getByEventVersion(eventStoreVersion: EventStoreVersion): Fragment =
     selectEvent(whereOpt = Some(sql"""eventStoreVersion = $eventStoreVersion"""))
