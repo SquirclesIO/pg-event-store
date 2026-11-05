@@ -17,6 +17,7 @@ import zio.stream.ZStream
 
 import EventRepository.Direction
 import EventRepository.Error
+import EventRepository.FromVersion
 import EventRepository.Subscription
 
 private class PostgresPlayJsonEventRepository(
@@ -64,10 +65,10 @@ private class PostgresPlayJsonEventRepository(
   }
 
   override def listenFromVersion[EventType: Reads: Tag](
-      fromExclusive: EventStoreVersion
+      from: FromVersion
   ): ZIO[Scope, Unexpected, Subscription[EventType]] = {
     implicit val getEventType: Get[EventType] = getJson[EventType]
-    postgresEventRepositoryLive.listenFromVersion[EventType](fromExclusive)
+    postgresEventRepositoryLive.listenFromVersion[EventType](from)
   }
 
   override def getAllEvents[A: Reads: Tag]: ZIO[Scope, Nothing, Stream[Unexpected, RepositoryEvent[A]]] = {
