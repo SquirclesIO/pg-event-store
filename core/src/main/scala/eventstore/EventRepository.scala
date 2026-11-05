@@ -2,6 +2,7 @@ package eventstore
 
 import eventstore.EventRepository.Direction
 import eventstore.EventRepository.Error.Unexpected
+import eventstore.EventRepository.FromVersion
 import eventstore.EventRepository.SaveEventError
 import eventstore.EventRepository.Subscription
 import eventstore.SwitchableZStream.Message
@@ -33,6 +34,13 @@ object EventRepository {
   trait Subscription[EventType] {
     def restartFromFirstEvent(lastEventToHandle: LastEventToHandle = LastEventToHandle.LastEvent): IO[Unexpected, Unit]
     def stream: ZStream[Any, Unexpected, EventStoreEvent[EventType]]
+  }
+
+  sealed trait FromVersion
+  object FromVersion {
+    case class Exclusive(version: EventStoreVersion) extends FromVersion
+    case class Inclusive(version: EventStoreVersion) extends FromVersion
+    case object Initial extends FromVersion
   }
 
   object Subscription {
@@ -124,7 +132,7 @@ trait EventRepository[Decoder[_], Encoder[_]] {
   def listen[EventType: Decoder: Tag]: ZIO[Scope, Unexpected, Subscription[EventType]]
 
   def listenFromVersion[EventType: Decoder: Tag](
-      fromExclusive: EventStoreVersion
+      from: FromVersion
   ): ZIO[Scope, Unexpected, Subscription[EventType]]
 
 }
