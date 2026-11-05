@@ -13,6 +13,8 @@ import zio.test._
 
 import EventRepositorySpec._
 
+import java.time.Instant
+
 object PostgresRawCodecs {
 
   def parseEvent1(input: String): Either[String, Event1] = input match {
@@ -101,6 +103,7 @@ object PostgresRawCodecs {
 
   def serializeUser(user: User): String = s"""{"type": "User", "id": "${user.id}"}"""
 
+  
   def parseAutomaticProcess(user: String): Either[String, AutomaticProcess] = user match {
     case s"""{"type": "AutomaticProcess", "id": "$value"}""" => Right(AutomaticProcess(value))
     case s"""{"id": "$value", "type": "AutomaticProcess"}""" => Right(AutomaticProcess(value))
@@ -109,6 +112,14 @@ object PostgresRawCodecs {
 
   def serializeAutomaticProcess(user: AutomaticProcess): String =
     s"""{"type": "AutomaticProcess", "id": "${user.id}"}"""
+
+  def parseMetadata(input: String): Either[String, Metadata] =
+    input match {
+      case s"""{"migratedAt": "${migratedAt}", "version": "${sourceGlobalVersion}"}""" => Right(Metadata(Instant.parse(migratedAt), sourceGlobalVersion.toLong))
+      case _ => Left("not metadata")
+    }
+  
+  def serializeMetadata(metadata: Metadata): String = s"""{"migratedAt": "${metadata.migratedAt.toString()}", "version": "${metadata.sourceGlobalVersion}"}"""
 
   val d2: Get[Event2] = Get[String].temap(parseEvent2)
 
@@ -211,8 +222,8 @@ object PostgresRawCodecs {
     eventWithDoneByDecoder = eventWithDoneByJsonGet,
     eventWithUserEncoder = eventWithUserJsonPut,
     eventWithUserDecoder = eventWithUserJsonGet,
-    metadataEncoder = Put[String].contramap(_ => ""),
-    metadataDecoder = Get[String].map(_ => ()),
+    metadataEncoder = Put[String].contramap(serializeMetadata),
+    metadataDecoder = Get[String].temap(parseMetadata)
   )
 
 }

@@ -50,6 +50,8 @@ object ZioJsonCodecs {
 
   val event2WithAutomaticProcessCodec: JsonCodec[(Event2, AutomaticProcess)] = d2 <*> automaticProcessJsonCodec
 
+  val metadataCodec: JsonCodec[Metadata] = DeriveJsonCodec.gen[Metadata]
+  
   implicit val codecs: Codecs[JsonDecoder, JsonEncoder] = Codecs(
     eventDecoder = JsonCodecEvent.decoder,
     event1Decoder = d1.decoder,
@@ -65,8 +67,8 @@ object ZioJsonCodecs {
     eventWithDoneByDecoder = eventWithDoneByCodec.decoder,
     eventWithUserEncoder = eventWithUserCodec.encoder,
     eventWithUserDecoder = eventWithUserCodec.decoder,
-    metadataEncoder = JsonEncoder.string.contramap(_ => ""),
-    metadataDecoder = JsonDecoder.string.map(_ => ())
+    metadataEncoder = metadataCodec.encoder,
+    metadataDecoder = metadataCodec.decoder
   )
 
 }

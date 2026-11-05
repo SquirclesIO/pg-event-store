@@ -9,6 +9,7 @@ import eventstore.EventRepositorySpec.DoneBy2
 import eventstore.EventRepositorySpec.Event
 import eventstore.EventRepositorySpec.Event1
 import eventstore.EventRepositorySpec.Event2
+import eventstore.EventRepositorySpec.Metadata
 import eventstore.EventRepositorySpec.doneBy1Gen
 import eventstore.EventRepositorySpec.doneBy2Gen
 import eventstore.EventRepositorySpec.event1Gen
@@ -26,6 +27,8 @@ import zio.durationInt
 import zio.test.*
 import zio.test.Assertion.*
 
+import java.time.Instant
+
 object Scala3Spec {
 
   type Union = (Event1, DoneBy1) | (Event2, DoneBy2)
@@ -39,8 +42,8 @@ object Scala3Spec {
     given Decoder[(Event2, DoneBy2)] = codecs.event2WithDoneBy2Decoder
     given Encoder[(Event1, DoneBy1)] = codecs.event1WithDoneBy1Encoder
     given Encoder[(Event2, DoneBy2)] = codecs.event2WithDoneBy2Encoder
-    given Encoder[Unit] = codecs.metadataEncoder
-    given Decoder[Unit] = codecs.metadataDecoder
+    given Encoder[Metadata] = codecs.metadataEncoder
+    given Decoder[Metadata] = codecs.metadataDecoder
 
     suite("scala 3 examples")(
       test("should dispatch events to all listeners with union type listen") {
@@ -48,23 +51,29 @@ object Scala3Spec {
           Live.live {
             for {
               repository <- ZIO.service[EventRepository[Decoder, Encoder]]
-              listener1 <- repository.listen[(Event1, DoneBy1), Unit].map(_.events)
-              listener2 <- repository.listen[Union, Unit].map(_.events)
-              listener3 <- repository.listen[(Event, DoneBy), Unit].map(_.events)
-              listener4 <- repository.listen[(Event2, DoneBy2), Unit].map(_.events)
+              listener1 <- repository.listen[(Event1, DoneBy1), Metadata].map(_.events)
+              listener2 <- repository.listen[Union, Metadata].map(_.events)
+              listener3 <- repository.listen[(Event, DoneBy), Metadata].map(_.events)
+              listener4 <- repository.listen[(Event2, DoneBy2), Metadata].map(_.events)
               streamId <- AggregateId.generate.map(aggregateId => {
                 EventStreamId(
                   aggregateId = aggregateId,
                   aggregateName = AggregateName("Foo")
                 )
               })
-              event <- (A: Event1).asRepositoryWriteEventWithDoneBy[DoneBy1](streamId = streamId, user = Bob)
+              metadata = Metadata(
+                migratedAt = Instant.parse("2007-12-03T10:15:30.00Z"),
+                sourceGlobalVersion = 12L)
+              event <- (A: Event1).asRepositoryWriteEventWithDoneBy[DoneBy1, Metadata](
+                streamId = streamId, 
+                user = Bob,
+                metadata = metadata)
               _ <- repository.saveEvents(streamId, Seq(event))
               events1 <- listener1.take(1).timeout(1.seconds).runCollect
               events2 <- listener2.take(1).timeout(1.seconds).runCollect
               events3 <- listener3.take(1).timeout(1.seconds).runCollect
               events4 <- listener4.take(1).timeout(1.seconds).runCollect
-              expected <- (A: Event1).asRepositoryEvent(streamId = streamId)
+              expected <- (A: Event1).asRepositoryEvent(streamId = streamId, metadata = metadata)
             } yield assert(events1.asStrings)(hasSameElements(Seq(expected.asString))) &&
               assert(events2.asRepositoryWriteEvents.asStrings)(hasSameElements(Seq(expected.asString))) &&
               assert(events3.asStrings)(hasSameElements(Seq(expected.asString))) &&
@@ -73,7 +82,7 @@ object Scala3Spec {
         }
       }.provideSome[R](repository),
       test("getEventStream should return appended events with user") {
-        val generator =
+        check {
           for
             (streamId, eventsA, _) <- eventsGen(event1Gen <*> doneBy1Gen, size1Gen = Gen.int(1, 20))
             version = eventsA.lastOption.map(_.aggregateVersion).getOrElse(AggregateVersion.initial)
@@ -83,14 +92,13 @@ object Scala3Spec {
             eventsA,
             eventsD.map(_.copy(aggregateId = streamId.aggregateId, aggregateName = streamId.aggregateName))
           )
-
-        check(generator) { case (streamId, events1, events2) =>
+        } { case (streamId, events1, events2) =>
           (ZIO
             .scoped(for {
               repository <- ZIO.service[EventRepository[Decoder, Encoder]]
-              _ <- repository.saveEvents[(Event1, DoneBy1), Unit](streamId, events1)
-              _ <- repository.saveEvents[(Event2, DoneBy2), Unit](streamId, events2)
-              stream <- repository.getEventStream[Union, Unit](streamId)
+              _ <- repository.saveEvents[(Event1, DoneBy1), Metadata](streamId, events1)
+              _ <- repository.saveEvents[(Event2, DoneBy2), Metadata](streamId, events2)
+              stream <- repository.getEventStream[Union, Metadata](streamId)
               result <- stream.runCollect
             } yield assert(result.asRepositoryWriteEvents)(equalTo(events1 ++ events2))))
             .provideSome[R](repository)
