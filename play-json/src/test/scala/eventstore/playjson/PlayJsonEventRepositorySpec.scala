@@ -10,6 +10,7 @@ import eventstore.EventRepositorySpec.Event
 import eventstore.EventRepositorySpec.Event1
 import eventstore.EventRepositorySpec.Event2
 import eventstore.EventRepositorySpec.User
+import eventstore.EventRepositorySpec.Metadata
 import eventstore.memory.MemoryEventRepository
 import eventstore.pg.test.PostgresTestUtils
 import eventstore.pg.test.PostgresTestUtils.DbAdmin
@@ -60,6 +61,8 @@ object PlayJsonCodecs {
     derived.oformat[(Event, User)]()
   }
 
+  val metadataJsonCodec: Format[Metadata] = derived.oformat[Metadata]()
+
   implicit val codecs: Codecs[Reads, Writes] = Codecs(
     eventDecoder = eventCodec,
     event1Decoder = event1Codec,
@@ -74,7 +77,9 @@ object PlayJsonCodecs {
     event2WithDoneBy2Decoder = event2WithDoneBy2Codec,
     eventWithDoneByDecoder = eventWithDoneByCodec,
     eventWithUserEncoder = eventWithUserCodec,
-    eventWithUserDecoder = eventWithUserCodec
+    eventWithUserDecoder = eventWithUserCodec,
+    metadataEncoder = metadataJsonCodec,
+    metadataDecoder = metadataJsonCodec,
   )
 
 }

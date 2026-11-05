@@ -32,50 +32,57 @@ private class PostgresZioJsonEventRepository(
   def putJson[A](implicit encoder: JsonEncoder[A]): Put[A] =
     Put[String].contramap(obj => encoder.encodeJson(obj, indent = None).toString)
 
-  override def getEventStream[A: JsonDecoder: Tag](
+  override def getEventStream[A: JsonDecoder: Tag, Metadata: JsonDecoder: Tag](
       eventStreamId: EventStreamId,
       direction: Direction = Direction.Forward
-  ): ZIO[Scope, Unexpected, Stream[Unexpected, RepositoryEvent[A]]] = {
+  ): ZIO[Scope, Unexpected, Stream[Unexpected, RepositoryEvent[A, Metadata]]] = {
     implicit val getA: Get[A] = getJson[A]
-    postgresEventRepositoryLive.getEventStream[A](eventStreamId, direction)
+    implicit val getMetadata: Get[Metadata] = getJson[Metadata]
+    postgresEventRepositoryLive.getEventStream[A, Metadata](eventStreamId, direction)
   }
 
-  override def saveEvents[A: JsonDecoder: JsonEncoder: Tag](
+  override def saveEvents[A: JsonDecoder: JsonEncoder: Tag, Metadata: JsonDecoder: JsonEncoder: Tag](
       eventStreamId: EventStreamId,
-      events: Seq[RepositoryWriteEvent[A]]
-  ): IO[EventRepository.SaveEventError, Seq[RepositoryEvent[A]]] = {
+      events: Seq[RepositoryWriteEvent[A, Metadata]]
+  ): IO[EventRepository.SaveEventError, Seq[RepositoryEvent[A, Metadata]]] = {
     implicit val getA: Get[A] = getJson[A]
     implicit val putA: Put[A] = putJson[A]
+    implicit val getMetadata: Get[Metadata] = getJson[Metadata]
+    implicit val putMetadata: Put[Metadata] = putJson[Metadata]
     postgresEventRepositoryLive.saveEvents(eventStreamId, events)
   }
 
-  override def listen[EventType: JsonDecoder: Tag]: ZIO[
+  override def listen[EventType: JsonDecoder: Tag, Metadata: JsonDecoder: Tag]: ZIO[
     Scope,
     Unexpected,
-    EventRepository.Subscription[EventType]
+    EventRepository.Subscription[EventType, Metadata]
   ] = {
     implicit val getEventType: Get[EventType] = getJson[EventType]
-    postgresEventRepositoryLive.listen[EventType]
+    implicit val getMetadata: Get[Metadata] = getJson[Metadata]
+    postgresEventRepositoryLive.listen[EventType, Metadata]
 
   }
 
-  override def listenFromVersion[EventType: JsonDecoder: Tag](
+  override def listenFromVersion[EventType: JsonDecoder: Tag, Metadata: JsonDecoder: Tag](
       from: FromVersion
-  ): ZIO[Scope, Unexpected, Subscription[EventType]] = {
+  ): ZIO[Scope, Unexpected, Subscription[EventType, Metadata]] = {
     implicit val getEventType: Get[EventType] = getJson[EventType]
-    postgresEventRepositoryLive.listenFromVersion[EventType](from)
+    implicit val getMetadata: Get[Metadata] = getJson[Metadata]
+    postgresEventRepositoryLive.listenFromVersion[EventType, Metadata](from)
   }
 
-  override def getAllEvents[A: JsonDecoder: Tag]: ZIO[Scope, Nothing, Stream[Unexpected, RepositoryEvent[A]]] = {
+  override def getAllEvents[A: JsonDecoder: Tag, Metadata: JsonDecoder: Tag]: ZIO[Scope, Nothing, Stream[Unexpected, RepositoryEvent[A, Metadata]]] = {
     implicit val getA: Get[A] = getJson[A]
-    postgresEventRepositoryLive.getAllEvents[A]
+    implicit val getMetadata: Get[Metadata] = getJson[Metadata]
+    postgresEventRepositoryLive.getAllEvents[A, Metadata]
   }
 
-  override def getEventByStoreVersion[A: JsonDecoder: Tag](
+  override def getEventByStoreVersion[A: JsonDecoder: Tag, Metadata: JsonDecoder: Tag](
       version: EventStoreVersion
-  ): IO[Unexpected, Option[RepositoryEvent[A]]] = {
+  ): IO[Unexpected, Option[RepositoryEvent[A, Metadata]]] = {
     implicit val getA: Get[A] = getJson[A]
-    postgresEventRepositoryLive.getEventByStoreVersion[A](version)
+    implicit val getMetadata: Get[Metadata] = getJson[Metadata]
+    postgresEventRepositoryLive.getEventByStoreVersion[A, Metadata](version)
   }
 
   override def listEventStreamWithName(

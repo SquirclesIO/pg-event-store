@@ -40,32 +40,32 @@ import scala.math.Ordering.Implicits.infixOrderingOps
 
 class PostgresEventRepositoryLive(
     transactor: ZTransactor,
-    hub: Hub[RepositoryEvent[Any]]
+    hub: Hub[RepositoryEvent[Any, Any]]
 ) extends EventRepository[Get, Put] {
 
   import Codecs.*
 
-  def getEventStream[A: Get: Tag](
+  def getEventStream[A: Get: Tag, Metadata: Get: Tag](
       eventStreamId: EventStreamId,
       direction: Direction = Direction.Forward
-  ): ZIO[Scope, Unexpected, Stream[Unexpected, RepositoryEvent[A]]] =
+  ): ZIO[Scope, Unexpected, Stream[Unexpected, RepositoryEvent[A, Metadata]]] =
     ZIO.succeed {
       fs2RIOStreamSyntax(
         Req
           .list(eventStreamId, direction)
-          .query[RepositoryEvent[A]]
+          .query[RepositoryEvent[A, Metadata]]
           .stream
           .transact(transactor)
       )
         .toZStream()
-        .tapErrorCause(ZIO.logErrorCause("getEventStream", _))
+        .tapErrorCause(ZIO.logErrorCause("get: TagEventStream", _))
         .mapError(Unexpected.apply)
     }
 
-  override def saveEvents[E: Get: Put: Tag](
+  override def saveEvents[E: Get: Put: Tag, Metadata: Get: Put: Tag](
       eventStreamId: EventStreamId,
-      writeEvents: Seq[RepositoryWriteEvent[E]]
-  ): IO[SaveEventError, Seq[RepositoryEvent[E]]] = {
+      writeEvents: Seq[RepositoryWriteEvent[E, Metadata]]
+  ): IO[SaveEventError, Seq[RepositoryEvent[E, Metadata]]] = {
     for {
       _ <- ZIO.fromEither(writeEvents.checkVersionsAreContiguousIncrements)
 
@@ -75,14 +75,14 @@ class PostgresEventRepositoryLive(
     } yield events
   }
 
-  override def listen[EventType: Get: Tag]: ZIO[Scope, Unexpected, Subscription[EventType]] =
+  override def listen[EventType: Get: Tag, Metadata: Get: Tag]: ZIO[Scope, Unexpected, Subscription[EventType, Metadata]] =
     for {
-      live <- fromHub[EventType]
-      fromDb = getAllEvents[EventType]
+      live <- fromHub[EventType, Metadata]
+      fromDb = getAllEvents[EventType, Metadata]
       switchableStream <- SwitchableZStream.from(live, fromDb)
     } yield Subscription.fromSwitchableStream(switchableStream, getLastEventStoreVersion)
 
-  private def fromHub[EventType: Tag]: ZIO[Scope, Nothing, ZStream[Any, Nothing, RepositoryEvent[EventType]]] =
+  private def fromHub[EventType: Tag, Metadata]: ZIO[Scope, Nothing, ZStream[Any, Nothing, RepositoryEvent[EventType, Metadata]]] =
     for {
       subscription <- hub.subscribe
     } yield {
@@ -91,15 +91,15 @@ class PostgresEventRepositoryLive(
       ZStream
         .fromQueue(subscription)
         .collect {
-          case event: RepositoryEvent[Any] if event.eventTag <:< eventTypeTag =>
-            event.asInstanceOf[RepositoryEvent[EventType]]
+          case event: RepositoryEvent[Any, Any] if event.eventTag <:< eventTypeTag =>
+            event.asInstanceOf[RepositoryEvent[EventType, Metadata]]
         }
     }
 
-  override def listenFromVersion[EventType: Get: Tag](
+  override def listenFromVersion[EventType: Get: Tag, Metadata: Get: Tag](
       from: FromVersion
-  ): ZIO[Scope, Unexpected, Subscription[EventType]] = {
-    val fromDb = getAllEvents[EventType]
+  ): ZIO[Scope, Unexpected, Subscription[EventType, Metadata]] = {
+    val fromDb = getAllEvents[EventType, Metadata]
     val query = from match {
       case FromVersion.Exclusive(version) => Req.listAllFromVersionExclusive(version)
       case FromVersion.Inclusive(version) => Req.listAllFromVersionInclusive(version)
@@ -107,14 +107,14 @@ class PostgresEventRepositoryLive(
     }
 
     for {
-      fromVersion <- getAllEventImpl[EventType](query = query)
-      live <- fromHub[EventType]
+      fromVersion <- getAllEventImpl[EventType, Metadata](query = query)
+      live <- fromHub[EventType, Metadata]
       switchableStream <- SwitchableZStream.from(fromVersion.concatIgnoringDuplicateElements(live), fromDb)
     } yield Subscription.fromSwitchableStream(switchableStream, getLastEventStoreVersion)
   }
 
-  implicit class StreamDeduplicateOps[R, E, A](self: ZStream[R, E, RepositoryEvent[A]]) {
-    def concatIgnoringDuplicateElements(stream: ZStream[R, E, RepositoryEvent[A]]) =
+  implicit class StreamDeduplicateOps[R, E, A, Metadata](self: ZStream[R, E, RepositoryEvent[A, Metadata]]) {
+    def concatIgnoringDuplicateElements(stream: ZStream[R, E, RepositoryEvent[A, Metadata]]) =
       ZStream.unwrap {
         for {
           lastFromDb <- Ref.make(EventStoreVersion.initial)
@@ -124,25 +124,25 @@ class PostgresEventRepositoryLive(
       }
   }
 
-  override def getAllEvents[A: Get: Tag]: ZIO[Scope, Nothing, Stream[Unexpected, RepositoryEvent[A]]] =
-    getAllEventImpl[A](Req.listAll)
+  override def getAllEvents[A: Get: Tag, Metadata: Get: Tag]: ZIO[Scope, Nothing, Stream[Unexpected, RepositoryEvent[A, Metadata]]] =
+    getAllEventImpl[A, Metadata](Req.listAll)
 
-  override def getEventByStoreVersion[A: Get: Tag](
+  override def getEventByStoreVersion[A: Get: Tag, Metadata: Get: Tag](
       version: EventStoreVersion
-  ): IO[Unexpected, Option[RepositoryEvent[A]]] =
+  ): IO[Unexpected, Option[RepositoryEvent[A, Metadata]]] =
     Req
       .getByEventVersion(version)
-      .query[RepositoryEvent[A]]
+      .query[RepositoryEvent[A, Metadata]]
       .option
       .transact(transactor)
       .tapErrorCause(ZIO.logErrorCause("getEventByStoreVersion", _))
       .mapError(Unexpected.apply)
 
-  private def getAllEventImpl[A: Get: Tag](query: Fragment) =
+  private def getAllEventImpl[A: Get: Tag, Metadata: Get: Tag](query: Fragment) =
     for {
-      queue <- ZIO.acquireRelease(Queue.bounded[Take[Unexpected, RepositoryEvent[A]]](16))(_.shutdown)
+      queue <- ZIO.acquireRelease(Queue.bounded[Take[Unexpected, RepositoryEvent[A, Metadata]]](16))(_.shutdown)
       _ <- query
-        .query[RepositoryEvent[A]]
+        .query[RepositoryEvent[A, Metadata]]
         .stream
         .transact(transactor)
         .toZStream()
@@ -172,10 +172,10 @@ class PostgresEventRepositoryLive(
       .transact(transactor)
       .mapError { Unexpected.apply }
 
-  private def transactionalSave[E: Get: Put: Tag](
+  private def transactionalSave[E: Get: Put: Tag, Metadata: Get: Put: Tag](
       eventStreamId: EventStreamId,
-      writeEvents: Seq[RepositoryWriteEvent[E]]
-  ): IO[SaveEventError, List[RepositoryEvent[E]]] =
+      writeEvents: Seq[RepositoryWriteEvent[E, Metadata]]
+  ): IO[SaveEventError, List[RepositoryEvent[E, Metadata]]] =
     (for {
       _ <- setTransactionIsolation
       expectedVersion <- queryMaxVersionForAggregate(eventStreamId)
@@ -204,27 +204,28 @@ class PostgresEventRepositoryLive(
     }
       .leftMap[SaveEventError](Unexpected.apply)
 
-  private def insertEvents[E: Get: Put: Tag](
+  private def insertEvents[E: Get: Put: Tag, Metadata: Get: Put: Tag](
       eventStreamId: EventStreamId,
-      writeEvents: Seq[RepositoryWriteEvent[E]]
-  ): EitherT[ConnectionIO, SaveEventError, List[RepositoryEvent[E]]] = for {
+      writeEvents: Seq[RepositoryWriteEvent[E, Metadata]]
+  ): EitherT[ConnectionIO, SaveEventError, List[RepositoryEvent[E, Metadata]]] = for {
     savepoint <- EitherT.right { FC.setSavepoint }
 
     result <- EitherT {
       Req
-        .insert[E]
-        .updateManyWithGeneratedKeys[RepositoryEvent[E]](
+        .insert[E, Metadata]
+        .updateManyWithGeneratedKeys[RepositoryEvent[E, Metadata]](
           "processid",
           "aggregateid",
           "aggregatename",
           "sentdate",
           "payload",
           "aggregateVersion",
-          "eventStoreVersion"
+          "eventStoreVersion",
+          "metadata"
         )(writeEvents)
         .compile
         .toList
-        .map[Either[SaveEventError, List[RepositoryEvent[E]]]](Right.apply)
+        .map[Either[SaveEventError, List[RepositoryEvent[E, Metadata]]]](Right.apply)
         .onUniqueViolation {
           generateVersionConflictError(
             eventStreamId = eventStreamId,
@@ -253,7 +254,7 @@ class PostgresEventRepositoryLive(
 
   private def checkExpectedVersion(
       expectedVersion: AggregateVersion,
-      newEvents: Seq[RepositoryWriteEvent[?]]
+      newEvents: Seq[RepositoryWriteEvent[?, ?]]
   ): EitherT[ConnectionIO, SaveEventError, Unit] =
     EitherT.fromEither {
       newEvents.headOption
@@ -291,14 +292,14 @@ object Codecs {
   implicit val offsetDateTimePut: Put[OffsetDateTime] =
     Put[String].contramap(_.format(DateTimeFormatter.ISO_DATE_TIME))
 
-  implicit def repositoryEventRead[E: Get: Tag]: Read[RepositoryEvent[E]] =
-    Read[(ProcessId, AggregateId, AggregateName, AggregateVersion, OffsetDateTime, EventStoreVersion, E)]
-      .map { x => RepositoryEvent(x._1, x._2, x._3, x._4, x._5, x._6, x._7) }
+  implicit def repositoryEventRead[E: Get: Tag, Metadata: Get]: Read[RepositoryEvent[E, Metadata]] =
+    Read[(ProcessId, AggregateId, AggregateName, AggregateVersion, OffsetDateTime, EventStoreVersion, E, Metadata)]
+      .map { x => RepositoryEvent(x._1, x._2, x._3, x._4, x._5, x._6, x._7, x._8) }
 
-  implicit def repositoryWriteEventWrite[E: Put]: Write[RepositoryWriteEvent[E]] =
-    Write[(ProcessId, AggregateId, AggregateName, AggregateVersion, OffsetDateTime, E)]
-      .contramap[RepositoryWriteEvent[E]] { x =>
-        (x.processId, x.aggregateId, x.aggregateName, x.aggregateVersion, x.sentDate, x.event)
+  implicit def repositoryWriteEventWrite[E: Put, Metadata: Put]: Write[RepositoryWriteEvent[E, Metadata]] =
+    Write[(ProcessId, AggregateId, AggregateName, AggregateVersion, OffsetDateTime, E, Metadata)]
+      .contramap[RepositoryWriteEvent[E, Metadata]] { x =>
+        (x.processId, x.aggregateId, x.aggregateName, x.aggregateVersion, x.sentDate, x.event, x.metadata)
       }
 }
 
@@ -318,7 +319,7 @@ private object Req {
     val aggId = eventStreamId.aggregateId
     val aggName = eventStreamId.aggregateName
 
-    sql"""select processid, aggregateid, aggregatename, aggregateVersion, sentdate, eventStoreVersion, payload
+    sql"""select processid, aggregateid, aggregatename, aggregateVersion, sentdate, eventStoreVersion, payload, metadata
 		  from events
 		  where aggregatename=$aggName
 		  and aggregateid=$aggId
@@ -338,7 +339,7 @@ private object Req {
     selectEvent(whereOpt = Some(sql"""eventStoreVersion = $eventStoreVersion"""))
 
   private def selectEvent(whereOpt: Option[Fragment]): Fragment =
-    sql"""select processid, aggregateid, aggregatename, aggregateVersion, sentdate, eventStoreVersion, payload
+    sql"""select processid, aggregateid, aggregatename, aggregateVersion, sentdate, eventStoreVersion, payload, metadata
 		  from events """ ++ Fragments.whereAndOpt(whereOpt) ++ Fragments.orderBy(sql"""eventStoreVersion""")
 
   def listStreams(aggregateName: AggregateName, direction: Direction): Fragment = {
@@ -355,15 +356,15 @@ private object Req {
           select aggregateid, aggregatename from aggregateWithMinVersion"""
   }
 
-  def insert[A: Put]: Update[RepositoryWriteEvent[A]] =
-    Update[RepositoryWriteEvent[A]](
+  def insert[A: Put, Metadata: Put]: Update[RepositoryWriteEvent[A, Metadata]] =
+    Update[RepositoryWriteEvent[A, Metadata]](
       """
               insert into events
-                (processid, aggregateid, aggregatename, aggregateVersion, sentdate, payload)
+                (processid, aggregateid, aggregatename, aggregateVersion, sentdate, payload, metadata)
               values
-                (?, ?, ?, ?, ?, ?::jsonb)
+                (?, ?, ?, ?, ?, ?::jsonb, ?)
 			  returning
-                processid, aggregateid, aggregatename, aggregateVersion, sentdate, eventStoreVersion, payload
+                processid, aggregateid, aggregatename, aggregateVersion, sentdate, eventStoreVersion, payload, metadata
      		"""
     )
 

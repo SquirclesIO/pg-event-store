@@ -31,9 +31,9 @@ object EventRepository {
     case object LastEvent extends LastEventToHandle
   }
 
-  trait Subscription[EventType] {
+  trait Subscription[EventType, Metadata] {
     def restartFromFirstEvent(lastEventToHandle: LastEventToHandle = LastEventToHandle.LastEvent): IO[Unexpected, Unit]
-    def stream: ZStream[Any, Unexpected, EventStoreEvent[EventType]]
+    def stream: ZStream[Any, Unexpected, EventStoreEvent[EventType, Metadata]]
   }
 
   sealed trait FromVersion
@@ -44,11 +44,11 @@ object EventRepository {
   }
 
   object Subscription {
-    def fromSwitchableStream[EventType](
-        switchableStream: SwitchableZStream[Any, Unexpected, RepositoryEvent[EventType]],
+    def fromSwitchableStream[EventType, Metadata](
+        switchableStream: SwitchableZStream[Any, Unexpected, RepositoryEvent[EventType, Metadata]],
         maybeLastVersion: IO[Unexpected, Option[EventStoreVersion]]
-    ): Subscription[EventType] =
-      new Subscription[EventType] {
+    ): Subscription[EventType, Metadata] =
+      new Subscription[EventType, Metadata] {
 
         override def restartFromFirstEvent(
             lastEventToHandle: LastEventToHandle = LastEventToHandle.LastEvent
@@ -63,7 +63,7 @@ object EventRepository {
                 .someOrElseZIO(switchableStream.switchToEmptyPastEvents)
           }
 
-        override def stream: ZStream[Any, Unexpected, EventStoreEvent[EventType]] =
+        override def stream: ZStream[Any, Unexpected, EventStoreEvent[EventType, Metadata]] =
           switchableStream.stream.collect {
             case Message.SwitchedToPastEvents => Reset
             case Message.Event(a)             => a
@@ -82,7 +82,7 @@ object EventRepository {
     case class Unexpected(throwable: Throwable) extends Error with SaveEventError
   }
 
-  implicit class EventsOps[E](self: Seq[RepositoryWriteEvent[E]]) {
+  implicit class EventsOps[E, Metadata](self: Seq[RepositoryWriteEvent[E, Metadata]]) {
 
     def checkVersionsAreContiguousIncrements: Either[Unexpected, Unit] = self match {
       case _ :: tail =>
@@ -108,31 +108,31 @@ trait EventRepository[Decoder[_], Encoder[_]] {
 
   def getLastEventStoreVersion: IO[Unexpected, Option[EventStoreVersion]]
 
-  def getAllEvents[A: Decoder: Tag]: ZIO[Scope, Nothing, Stream[Unexpected, RepositoryEvent[A]]]
+  def getAllEvents[A: Decoder: Tag, Metadata: Decoder: Tag]: ZIO[Scope, Nothing, Stream[Unexpected, RepositoryEvent[A, Metadata]]]
 
-  def getEventByStoreVersion[A: Decoder: Tag](
+  def getEventByStoreVersion[A: Decoder: Tag, Metadata: Decoder: Tag](
       version: EventStoreVersion
-  ): IO[Unexpected, Option[RepositoryEvent[A]]]
+  ): IO[Unexpected, Option[RepositoryEvent[A, Metadata]]]
 
   def listEventStreamWithName(
       aggregateName: AggregateName,
       direction: Direction = Direction.Forward
   ): Stream[Unexpected, EventStreamId]
 
-  def getEventStream[A: Decoder: Tag](
+  def getEventStream[A: Decoder: Tag, Metadata: Decoder: Tag](
       eventStreamId: EventStreamId,
       direction: Direction = Direction.Forward
-  ): ZIO[Scope, Unexpected, Stream[Unexpected, RepositoryEvent[A]]]
+  ): ZIO[Scope, Unexpected, Stream[Unexpected, RepositoryEvent[A, Metadata]]]
 
-  def saveEvents[A: Decoder: Encoder: Tag](
+  def saveEvents[A: Decoder: Encoder: Tag, Metadata: Decoder: Encoder: Tag](
       eventStreamId: EventStreamId,
-      events: Seq[RepositoryWriteEvent[A]]
-  ): IO[SaveEventError, Seq[RepositoryEvent[A]]]
+      events: Seq[RepositoryWriteEvent[A, Metadata]]
+  ): IO[SaveEventError, Seq[RepositoryEvent[A, Metadata]]]
 
-  def listen[EventType: Decoder: Tag]: ZIO[Scope, Unexpected, Subscription[EventType]]
+  def listen[EventType: Decoder: Tag, Metadata: Decoder: Tag]: ZIO[Scope, Unexpected, Subscription[EventType, Metadata]]
 
-  def listenFromVersion[EventType: Decoder: Tag](
+  def listenFromVersion[EventType: Decoder: Tag, Metadata: Decoder: Tag](
       from: FromVersion
-  ): ZIO[Scope, Unexpected, Subscription[EventType]]
+  ): ZIO[Scope, Unexpected, Subscription[EventType, Metadata]]
 
 }

@@ -12,65 +12,71 @@ import java.time.OffsetDateTime
 object RepositoryEventOps {
 
   implicit class Ops[A: Tag](a: A) {
-    def asRepositoryEvent(
+    def asRepositoryEvent[Metadata](
         version: AggregateVersion = AggregateVersion.initial,
         eventStoreVersion: EventStoreVersion = EventStoreVersion.initial,
-        streamId: EventStreamId
-    ): ZIO[Any, Nothing, RepositoryEvent[A]] = {
+        streamId: EventStreamId,
+        metadata: Metadata
+    ): ZIO[Any, Nothing, RepositoryEvent[A, Metadata]] = {
       for {
         processId <- ProcessId.generate
-      } yield RepositoryEvent[A](
+      } yield RepositoryEvent[A, Metadata](
         processId = processId,
         aggregateId = streamId.aggregateId,
         aggregateName = streamId.aggregateName,
         sentDate = OffsetDateTime.parse("2027-12-03T10:15:30+01:00"),
         aggregateVersion = version,
         event = a,
-        eventStoreVersion = eventStoreVersion
+        eventStoreVersion = eventStoreVersion,
+        metadata = metadata
       )
     }
-    def asRepositoryWriteEvent(
-        version: AggregateVersion = AggregateVersion.initial,
-        streamId: EventStreamId
-    ): ZIO[Any, Nothing, RepositoryWriteEvent[A]] = {
-      for {
-        processId <- ProcessId.generate
-      } yield RepositoryWriteEvent[A](
-        processId = processId,
-        aggregateId = streamId.aggregateId,
-        aggregateName = streamId.aggregateName,
-        sentDate = OffsetDateTime.parse("2027-12-03T10:15:30+01:00"),
-        aggregateVersion = version,
-        event = a
-      )
-    }
-    def asRepositoryWriteEventWithDoneBy[U](
+    def asRepositoryWriteEvent[Metadata](
         version: AggregateVersion = AggregateVersion.initial,
         streamId: EventStreamId,
-        user: U
-    ): ZIO[Any, Nothing, RepositoryWriteEvent[(A, U)]] = {
+        metadata: Metadata
+    ): ZIO[Any, Nothing, RepositoryWriteEvent[A, Metadata]] = {
       for {
         processId <- ProcessId.generate
-      } yield RepositoryWriteEvent[(A, U)](
+      } yield RepositoryWriteEvent[A, Metadata](
         processId = processId,
         aggregateId = streamId.aggregateId,
         aggregateName = streamId.aggregateName,
         sentDate = OffsetDateTime.parse("2027-12-03T10:15:30+01:00"),
         aggregateVersion = version,
-        event = (a, user)
+        event = a,
+        metadata = metadata
+      )
+    }
+    def asRepositoryWriteEventWithDoneBy[U, Metadata](
+        version: AggregateVersion = AggregateVersion.initial,
+        streamId: EventStreamId,
+        user: U,
+        metadata: Metadata
+    ): ZIO[Any, Nothing, RepositoryWriteEvent[(A, U), Metadata]] = {
+      for {
+        processId <- ProcessId.generate
+      } yield RepositoryWriteEvent[(A, U), Metadata](
+        processId = processId,
+        aggregateId = streamId.aggregateId,
+        aggregateName = streamId.aggregateName,
+        sentDate = OffsetDateTime.parse("2027-12-03T10:15:30+01:00"),
+        aggregateVersion = version,
+        event = (a, user),
+        metadata = metadata
       )
     }
   }
 
-  implicit class WriteEventsOps[+E](
-      events: Seq[RepositoryEvent[E]]
+  implicit class WriteEventsOps[+E, Metadata](
+      events: Seq[RepositoryEvent[E, Metadata]]
   ) {
-    def asRepositoryWriteEvents: Seq[RepositoryWriteEvent[E]] =
+    def asRepositoryWriteEvents: Seq[RepositoryWriteEvent[E, Metadata]] =
       events.map(_.asRepositoryWriteEvent)
   }
 
-  implicit class WriteEventOps[+E](
-      event: RepositoryEvent[E]
+  implicit class WriteEventOps[+E, +Metadata](
+      event: RepositoryEvent[E, Metadata]
   ) {
     def asRepositoryWriteEvent =
       RepositoryWriteEvent(
@@ -79,7 +85,8 @@ object RepositoryEventOps {
         aggregateName = event.aggregateName,
         aggregateVersion = event.aggregateVersion,
         sentDate = event.sentDate,
-        event = event.event
+        event = event.event,
+        metadata = event.metadata
       )
   }
 
