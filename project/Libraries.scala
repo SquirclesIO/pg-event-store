@@ -2,7 +2,7 @@ import sbt.*
 
 object Libraries {
   val zio_version = "2.1.27"
-  val doobie_version = "1.0.0-RC13"
+  val doobie_version = "1.0.0-RC14"
 
   val zio = Seq(
     "dev.zio" %% "zio" % zio_version,
