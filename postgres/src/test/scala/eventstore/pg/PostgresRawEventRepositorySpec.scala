@@ -11,6 +11,8 @@ import zio.ZLayer
 import zio.durationInt
 import zio.test._
 
+import java.time.Instant
+
 import EventRepositorySpec._
 
 object PostgresRawCodecs {
@@ -109,6 +111,16 @@ object PostgresRawCodecs {
 
   def serializeAutomaticProcess(user: AutomaticProcess): String =
     s"""{"type": "AutomaticProcess", "id": "${user.id}"}"""
+
+  def parseMetadata(input: String): Either[String, Metadata] =
+    input match {
+      case s"""{"migratedAt": "${migratedAt}", "version": "${sourceGlobalVersion}"}""" =>
+        Right(Metadata(Instant.parse(migratedAt), sourceGlobalVersion.toLong))
+      case _ => Left("not metadata")
+    }
+
+  def serializeMetadata(metadata: Metadata): String =
+    s"""{"migratedAt": "${metadata.migratedAt.toString()}", "version": "${metadata.sourceGlobalVersion}"}"""
 
   val d2: Get[Event2] = Get[String].temap(parseEvent2)
 
@@ -210,7 +222,9 @@ object PostgresRawCodecs {
     event2WithDoneBy2Decoder = event2WithDoneBy2JsonGet,
     eventWithDoneByDecoder = eventWithDoneByJsonGet,
     eventWithUserEncoder = eventWithUserJsonPut,
-    eventWithUserDecoder = eventWithUserJsonGet
+    eventWithUserDecoder = eventWithUserJsonGet,
+    metadataEncoder = Put[String].contramap(serializeMetadata),
+    metadataDecoder = Get[String].temap(parseMetadata)
   )
 
 }
