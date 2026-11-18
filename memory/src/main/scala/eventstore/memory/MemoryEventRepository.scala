@@ -22,6 +22,7 @@ import EventRepository.Error.Unexpected
 import EventRepository.Error.VersionConflict
 import EventRepository.Direction
 import EventRepository.EventsOps
+import EventRepository.FromVersion
 import EventRepository.SaveEventError
 import EventRepository.Subscription
 
@@ -94,12 +95,17 @@ class MemoryEventRepository[UnusedDecoder[_], UnusedEncoder[_]](
     listenImpl(live = fromHub[EventType])
 
   override def listenFromVersion[EventType: UnusedDecoder: Tag](
-      fromExclusive: EventStoreVersion
+      from: FromVersion
   ): ZIO[Scope, Unexpected, Subscription[EventType]] = {
+    val predicate: RepositoryEvent[EventType] => Boolean = from match {
+      case FromVersion.Exclusive(version) => _.eventStoreVersion <= version
+      case FromVersion.Inclusive(version) => _.eventStoreVersion < version
+      case FromVersion.Initial            => _ => false
+    }
     val live = for {
       fromDb <- getAllEvents[EventType]
       fromHub <- fromHub[EventType]
-    } yield fromDb.concat(fromHub).dropWhile(_.eventStoreVersion <= fromExclusive)
+    } yield fromDb.concat(fromHub).dropWhile(predicate)
     listenImpl(live = live)
   }
 

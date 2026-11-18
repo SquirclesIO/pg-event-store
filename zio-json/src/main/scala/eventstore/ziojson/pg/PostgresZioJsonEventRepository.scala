@@ -3,6 +3,7 @@ package eventstore.ziojson.pg
 import eventstore.EventRepository
 import eventstore.EventRepository.Direction
 import eventstore.EventRepository.Error.Unexpected
+import eventstore.EventRepository.FromVersion
 import eventstore.EventRepository.Subscription
 import eventstore.RepositoryEvent
 import eventstore.RepositoryWriteEvent
@@ -59,10 +60,10 @@ private class PostgresZioJsonEventRepository(
   }
 
   override def listenFromVersion[EventType: JsonDecoder: Tag](
-      fromExclusive: EventStoreVersion
+      from: FromVersion
   ): ZIO[Scope, Unexpected, Subscription[EventType]] = {
     implicit val getEventType: Get[EventType] = getJson[EventType]
-    postgresEventRepositoryLive.listenFromVersion[EventType](fromExclusive)
+    postgresEventRepositoryLive.listenFromVersion[EventType](from)
   }
 
   override def getAllEvents[A: JsonDecoder: Tag]: ZIO[Scope, Nothing, Stream[Unexpected, RepositoryEvent[A]]] = {
