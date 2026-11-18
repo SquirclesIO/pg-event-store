@@ -40,51 +40,51 @@ object PostgresTestUtils {
   }
 
   val doobieLogger: LogHandler[Task] = {
-    case Success(s, a, l, e1, e2) =>
-      val paramsStr = a match {
+    case success: Success =>
+      val paramsStr = success.params match {
         case nonBatch: Parameters.NonBatch => s"[${nonBatch.paramsAsList.mkString(", ")}]"
         case _: Parameters.Batch           => "<batch arguments not rendered>"
       }
       ZIO.debug(
         s"""Successful Statement Execution:
            |
-           |  ${s.linesIterator.dropWhile(_.trim.isEmpty).mkString("\n  ")}
+           |  ${success.sql.linesIterator.dropWhile(_.trim.isEmpty).mkString("\n  ")}
            |
            | parameters = $paramsStr
-           | label     = $l
-           | elapsed = ${e1.toMillis.toString} ms exec + ${e2.toMillis.toString} ms processing (${(e1 + e2).toMillis.toString} ms total)
+           | label     = ${success.label}
+           | elapsed = ${success.exec.toMillis.toString} ms exec + ${success.processing.toMillis.toString} ms processing (${(success.exec + success.processing).toMillis.toString} ms total)
               """.stripMargin
       )
 
-    case ProcessingFailure(s, a, l, e1, e2, t) =>
-      val paramsStr = a.allParams
+    case failure: ProcessingFailure =>
+      val paramsStr = failure.params.allParams
         .map(thisArgs => thisArgs.mkString("(", ", ", ")"))
         .mkString("[", ", ", "]")
       ZIO.debug(
         s"""Failed Resultset Processing:
            |
-           |  ${s.linesIterator.dropWhile(_.trim.isEmpty).mkString("\n  ")}
+           |  ${failure.sql.linesIterator.dropWhile(_.trim.isEmpty).mkString("\n  ")}
            |
            | parameters = $paramsStr
-           | label     = $l
-           | elapsed = ${e1.toMillis.toString} ms exec + ${e2.toMillis.toString} ms processing (failed) (${(e1 + e2).toMillis.toString} ms total)
-           | failure = ${t.getMessage}
+           | label     = ${failure.label}
+           | elapsed = ${failure.exec.toMillis.toString} ms exec + ${failure.processing.toMillis.toString} ms processing (failed) (${(failure.exec + failure.processing).toMillis.toString} ms total)
+           | failure = ${failure.failure.getMessage}
               """.stripMargin
       )
 
-    case ExecFailure(s, a, l, e1, t) =>
-      val paramsStr = a.allParams
+    case failure: ExecFailure =>
+      val paramsStr = failure.params.allParams
         .map(thisArgs => thisArgs.mkString("(", ", ", ")"))
         .mkString("[", ", ", "]")
       ZIO.debug(
         s"""Failed Statement Execution:
            |
-           |  ${s.linesIterator.dropWhile(_.trim.isEmpty).mkString("\n  ")}
+           |  ${failure.sql.linesIterator.dropWhile(_.trim.isEmpty).mkString("\n  ")}
            |
            | parameters = $paramsStr
-           | label     = $l
-           | elapsed = ${e1.toMillis.toString} ms exec (failed)
-           | failure = ${t.getMessage}
+           | label     = ${failure.label}
+           | elapsed = ${failure.exec.toMillis.toString} ms exec (failed)
+           | failure = ${failure.failure.getMessage}
               """.stripMargin
       )
   }
