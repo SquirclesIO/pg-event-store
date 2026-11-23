@@ -27,7 +27,7 @@ object Libraries {
   )
 
   val logback = Seq(
-    "ch.qos.logback" % "logback-classic" % "1.6.7"
+    "ch.qos.logback" % "logback-classic" % "1.6.8"
   )
 
   val `play-json-libs` = Seq(
